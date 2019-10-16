@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+
+####
+# LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected.
+#
+# Version: 0.99
+#
+# INSTALLATION
+#
+# 1. Run the following command, as Root:
+#
+# mkdir -p ~/loadwatch; wget -O ~/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x ./mysqlrepairall
+#
+# 2. Create the following CRON entry in Root's crontab:
+#
+# */1 * * * * /root/loadwatch/loadwatch
+#
+# 3. You're done.  It'll run every minute and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.
+#    It then cleans up any old log files older than 14 days.
+#
+# CONFIGURATION
+#
+# Set the THRESH and RETEN variables at the top of the file to the desired numbers.
+####
+
+# 
+FILE=loadwatch.$(date +%F.%H.%M)
+DIR=/root/loadwatch
+# Load Threshold for doing a dump. Default is 50% of CPU.
+THRESH=
+# Retention duration of log files. Default is 14 days.
+RETEN=
+
+########################################################################
+# NO MORE CHANGES BELOW THIS POINT, UNLESS YOU KNOW WHAT YOU'RE DOING. #
+########################################################################
+
+if [ ! -d $DIR ]
+then
+	mkdir -p $DIR
+fi
+
+LOAD=$(cat /proc/loadavg | awk -F '.' '{print $1}')
+
+#echo `date +%F.%X` - Load: $LOAD >> $DIR/checklog
+
+dump() {
+    echo Loadwatch tripped, dumping info to $DIR/$FILE >> $DIR/checklog
+    echo `date +%F.%H.%M` > $DIR/$FILE
+    free -m >> $DIR/$FILE
+    mysqladmin processlist stat >> $DIR/$FILE
+    /usr/sbin/apachectl fullstatus >> $DIR/$FILE
+    netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head >> $DIR/$FILE
+    top -bcn1 >> $DIR/$FILE
+    ps auxf >> $DIR/$FILE
+    /usr/sbin/exiwhat >> $DIR/$FILE
+    iostat >> $DIR/$FILE
+}
+
+cleanup() {
+	if [ -z "$RETEN" ]
+	then
+		RETEN=14
+	fi
+	cd $DIR
+	find . -name loadwatch.* -mtime +"$RETEN" -exec rm -f {} \;
+}
+
+if [ -z "$THRESH" ]
+then
+	MAX=$(lscpu | grep "per socket:" | awk '{print $4}')
+	THRESH=$(expr $MAX / 2)
+	if [ $LOAD -gt $THRESH ]
+	then
+		dump()
+		cleanup()
+	fi
+else
+	if [ $LOAD -gt $THRESH ]
+	then
+		dump()
+		cleanup()
+	fi
+fi
+
+exit 0

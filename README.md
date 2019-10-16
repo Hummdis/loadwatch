@@ -1,2 +1,23 @@
 # loadwatch
 Linux System Load Watch
+
+LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected.
+
+Version: 0.99
+
+INSTALLATION
+
+1. Run the following command, as Root:
+
+mkdir -p ~/loadwatch; wget -O ~/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x ./mysqlrepairall
+
+2. Create the following CRON entry in Root's crontab:
+
+*/1 * * * * /root/loadwatch/loadwatch
+
+3. You're done.  It'll run every minute and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.
+   It then cleans up any old log files older than 14 days.
+
+CONFIGURATION
+
+Set the THRESH and RETEN variables at the top of the file to the desired numbers.

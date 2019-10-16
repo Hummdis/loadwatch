@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 
+# CREDIT
+# Written by jonathonrox24 (https://github.com/jonathonrox24) and updated by Hummdis (hummdis.com).
+
 ####
 # LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected.
 #
-# Version: 0.99
+# Version: 1.0
 #
 # INSTALLATION
 #
@@ -69,6 +72,10 @@ cleanup() {
 if [ -z "$THRESH" ]
 then
 	MAX=$(lscpu | grep "per socket:" | awk '{print $4}')
+	if [ -z "$MAX" ]
+	then
+		MAX=$(cat /proc/cpuinfo | grep "cpu cores" | tail -1 | awk '{print $4}')
+	fi
 	THRESH=$(expr $MAX / 2)
 	if [ $LOAD -gt $THRESH ]
 	then

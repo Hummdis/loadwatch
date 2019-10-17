@@ -3,7 +3,7 @@ Linux System Load Watch
 
 LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected or wanted.
 
-#### Version: 1.1.1
+#### Version: 1.1.2
 
 ## INSTALLATION
 
@@ -21,7 +21,7 @@ LoadWatch - A more lightweight version of Sys-Snap and only triggers when the lo
 
        */1 * * * * /root/loadwatch/loadwatch
 
-4. You're done.  It'll run every minute and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.  It then cleans up any old log files older than 14 days.
+4. You're done.  It'll run every minute and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.  If the server is a virtual machine (i.e. VPS), then the maximum load is 16 with a reported load of 8 or higher. This can be overridden, of course.  It then cleans up any old log files older than 14 days.
 
 ## CONFIGURATION
 

@@ -6,7 +6,7 @@
 ####
 # LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected or wanted.
 #
-# Version: 1.1.0
+# Version: 1.1.0.1
 #
 # INSTALLATION
 #
@@ -77,8 +77,8 @@ cleanup_files() {
 
 virtual_check() {
     # Check for facter
-    if [ $(fracter) -ne 0 ]; then
-        echo "Fracter is not installed. Please install it with the proper package manager for your distribution:"
+    if [ $(facter) -ne 0 ]; then
+        echo "Facter is not installed. Please install it with the proper package manager for your distribution:"
         echo -e "\tsudo pacman -S facter"
         echo -e "\tsudo dnf install facter"
         echo -e "\tyum install epel-release && yum install fracter"

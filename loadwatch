@@ -6,7 +6,7 @@
 ####
 # LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected or wanted.
 #
-# Version: 1.1.1
+# Version: 1.1.2
 #
 # INSTALLATION
 #
@@ -27,6 +27,7 @@
 # */1 * * * * /root/loadwatch/loadwatch
 #
 # 4. You're done.  It'll run every minute and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.
+#    If the server is a virtual machine (i.e. VPS), then the maximum load is 16 with a reported load of 8 or higher. This can be overridden, of course.
 #    It then cleans up any old log files older than 14 days.
 #
 # CONFIGURATION
@@ -36,7 +37,9 @@
 
 FILE=loadwatch.$(date +%F.%H.%M)
 DIR=/root/loadwatch
-# Load Threshold for doing a dump. Default is 50% of CPU.
+
+# Change these two variables to override the defaults.
+# Load Threshold for doing a dump. Default is 50% of CPU for physical servers and a load average of 8 for virtual servers.
 THRESH=
 # Retention duration of log files. Default is 14 days.
 RETEN=
@@ -108,7 +111,7 @@ lscpu_check() {
 run_job() {
 	if [ -z "$THRESH" ]; then
 		if [ virtual_check ]; then
-			MAX=2
+			MAX=16
 		elif [ lscpu_check ]; then
 			MAX=$(lscpu | grep "per socket:" | awk '{print $4}')
 		else

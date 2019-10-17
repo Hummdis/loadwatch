@@ -6,7 +6,7 @@
 ####
 # LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected or wanted.
 #
-# Version: 1.1.0.1
+# Version: 1.1.1
 #
 # INSTALLATION
 #
@@ -34,13 +34,12 @@
 # Set the THRESH and RETEN variables at the top of the file to the desired numbers.
 ####
 
- 
 FILE=loadwatch.$(date +%F.%H.%M)
 DIR=/root/loadwatch
 # Load Threshold for doing a dump. Default is 50% of CPU.
-THRESH=''
+THRESH=
 # Retention duration of log files. Default is 14 days.
-RETEN=''
+RETEN=
 
 ########################################################################
 # NO MORE CHANGES BELOW THIS POINT, UNLESS YOU KNOW WHAT YOU'RE DOING. #
@@ -75,38 +74,55 @@ cleanup_files() {
     find . -name loadwatch.* -mtime +$RETEN -exec rm -f {} \;
 }
 
+facter_check() {
+	facter > /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Facter is not installed. Please install it with the proper package manager for your distribution:"
+		echo -e "\tsudo pacman -S facter"
+		echo -e "\tsudo dnf install facter"
+		echo -e "\tyum install epel-release && yum install fracter"
+		echo -e "\tzypper install facter"
+		echo -e "\n\nExiting."
+		exit 1
+	fi
+}
+
 virtual_check() {
-    # Check for facter
-    if [ $(facter) -ne 0 ]; then
-        echo "Facter is not installed. Please install it with the proper package manager for your distribution:"
-        echo -e "\tsudo pacman -S facter"
-        echo -e "\tsudo dnf install facter"
-        echo -e "\tyum install epel-release && yum install fracter"
-        echo -e "\tzypper install facter"
-        echo -e "\n\nExiting."
-        exit 1
-    fi
+	facter_check
     if [ $(facter | grep is_virtual | awk '{print $3}') == 'true' ]; then
-        return true
+        return 0 # True
     else
-        return false
+        return 1 # False
     fi
 }
 
-if [ -z "$THRESH" ]; then
-    if [ virtual_check ]; then
-        MAX=2
-    elif [ $(lscpu) -eq 0 ]; then
-        MAX=$(lscpu | grep "per socket:" | awk '{print $4}')
-    else
-        MAX=$(cat /proc/cpuinfo | grep "cpu cores" | tail -1 | awk '{print $4}')
-    fi
-    THRESH=$(expr $MAX / 2)
-fi
+lscpu_check() {
+	lscpu > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		return 0 # True
+	else
+		return 1 # False
+	fi
+}
 
-if [ $LOAD -gt $THRESH ]; then
-    dump_stats
-    cleanup_files
-fi
+run_job() {
+	if [ -z "$THRESH" ]; then
+		if [ virtual_check ]; then
+			MAX=2
+		elif [ lscpu_check ]; then
+			MAX=$(lscpu | grep "per socket:" | awk '{print $4}')
+		else
+			MAX=$(cat /proc/cpuinfo | grep "cpu cores" | tail -1 | awk '{print $4}')
+		fi
+		THRESH=$(expr $MAX / 2)
+	fi
+
+	if [ $LOAD -gt $THRESH ]; then
+		dump_stats
+		cleanup_files
+	fi
+}
+
+run_job
 
 exit 0

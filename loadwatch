@@ -14,12 +14,12 @@
 #
 # mkdir -p ~/loadwatch; wget -O ~/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x ~/loadwatch/loadwatch
 #
-# 2. Install fracter
+# 2. Install facter
 #
 #  Please install it with the proper package manager for your distribution:
 #       Arch Linux, Manjaro Linux: sudo pacman -S facter
 #       Fedora: sudo dnf install facter
-#       CentOS, RHEL: sudo yum install epel-release && sudo yum install fracter
+#       CentOS, RHEL: sudo yum install epel-release && sudo yum install facter
 #       openSUSE: sudo zypper install facter
 #
 # 3. Create the following CRON entry in Root's crontab:

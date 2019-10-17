@@ -4,9 +4,9 @@
 # Written by jonathonrox24 (https://github.com/jonathonrox24) and updated by Hummdis (hummdis.com).
 
 ####
-# LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected.
+# LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected or wanted.
 #
-# Version: 1.0
+# Version: 1.1.0
 #
 # INSTALLATION
 #
@@ -14,11 +14,19 @@
 #
 # mkdir -p ~/loadwatch; wget -O ~/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x ~/loadwatch/loadwatch
 #
-# 2. Create the following CRON entry in Root's crontab:
+# 2. Install fracter
+#
+#  Please install it with the proper package manager for your distribution:
+#       Arch Linux, Manjaro Linux: sudo pacman -S facter
+#       Fedora: sudo dnf install facter
+#       CentOS, RHEL: sudo yum install epel-release && sudo yum install fracter
+#       openSUSE: sudo zypper install facter
+#
+# 3. Create the following CRON entry in Root's crontab:
 #
 # */1 * * * * /root/loadwatch/loadwatch
 #
-# 3. You're done.  It'll run every minute and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.
+# 4. You're done.  It'll run every minute and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.
 #    It then cleans up any old log files older than 14 days.
 #
 # CONFIGURATION
@@ -26,30 +34,29 @@
 # Set the THRESH and RETEN variables at the top of the file to the desired numbers.
 ####
 
-# 
+ 
 FILE=loadwatch.$(date +%F.%H.%M)
 DIR=/root/loadwatch
 # Load Threshold for doing a dump. Default is 50% of CPU.
-THRESH=
+THRESH=''
 # Retention duration of log files. Default is 14 days.
-RETEN=
+RETEN=''
 
 ########################################################################
 # NO MORE CHANGES BELOW THIS POINT, UNLESS YOU KNOW WHAT YOU'RE DOING. #
 ########################################################################
 
-if [ ! -d $DIR ]
-then
-	mkdir -p $DIR
+if [ ! -d $DIR ]; then
+    mkdir -p $DIR
 fi
 
 LOAD=$(cat /proc/loadavg | awk -F '.' '{print $1}')
 
 #echo `date +%F.%X` - Load: $LOAD >> $DIR/checklog
 
-dump() {
+dump_stats() {
     echo Loadwatch tripped, dumping info to $DIR/$FILE >> $DIR/checklog
-    echo `date +%F.%H.%M` > $DIR/$FILE
+    echo $(date +%F.%H.%M) > $DIR/$FILE
     free -m >> $DIR/$FILE
     mysqladmin processlist stat >> $DIR/$FILE
     /usr/sbin/apachectl fullstatus >> $DIR/$FILE
@@ -60,34 +67,46 @@ dump() {
     iostat >> $DIR/$FILE
 }
 
-cleanup() {
-	if [ -z "$RETEN" ]
-	then
-		RETEN=14
-	fi
-	cd $DIR
-	find . -name loadwatch.* -mtime +"$RETEN" -exec rm -f {} \;
+cleanup_files() {
+    if [ -z "$RETEN" ]; then
+        RETEN=14
+    fi
+    cd $DIR
+    find . -name loadwatch.* -mtime +$RETEN -exec rm -f {} \;
 }
 
-if [ -z "$THRESH" ]
-then
-	MAX=$(lscpu | grep "per socket:" | awk '{print $4}')
-	if [ -z "$MAX" ]
-	then
-		MAX=$(cat /proc/cpuinfo | grep "cpu cores" | tail -1 | awk '{print $4}')
-	fi
-	THRESH=$(expr $MAX / 2)
-	if [ $LOAD -gt $THRESH ]
-	then
-		dump()
-		cleanup()
-	fi
-else
-	if [ $LOAD -gt $THRESH ]
-	then
-		dump()
-		cleanup()
-	fi
+virtual_check() {
+    # Check for facter
+    if [ $(fracter) -ne 0 ]; then
+        echo "Fracter is not installed. Please install it with the proper package manager for your distribution:"
+        echo -e "\tsudo pacman -S facter"
+        echo -e "\tsudo dnf install facter"
+        echo -e "\tyum install epel-release && yum install fracter"
+        echo -e "\tzypper install facter"
+        echo -e "\n\nExiting."
+        exit 1
+    fi
+    if [ $(facter | grep is_virtual | awk '{print $3}') == 'true' ]; then
+        return true
+    else
+        return false
+    fi
+}
+
+if [ -z "$THRESH" ]; then
+    if [ virtual_check ]; then
+        MAX=2
+    elif [ $(lscpu) -eq 0 ]; then
+        MAX=$(lscpu | grep "per socket:" | awk '{print $4}')
+    else
+        MAX=$(cat /proc/cpuinfo | grep "cpu cores" | tail -1 | awk '{print $4}')
+    fi
+    THRESH=$(expr $MAX / 2)
+fi
+
+if [ $LOAD -gt $THRESH ]; then
+    dump_stats
+    cleanup_files
 fi
 
 exit 0

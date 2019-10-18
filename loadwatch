@@ -49,7 +49,7 @@ RETEN=
 ########################################################################
 
 # Variables
-VERSION=1.1.4
+VERSION=1.1.5
 DATE=$(date +%F.%H%M)
 LOAD=$(cat /proc/loadavg | awk '{print $1}')
 FILE=loadwatch_$DATE_Load.$LOAD
@@ -64,7 +64,7 @@ fi
 
 # Gather the system stats and put them into the log.
 dump_stats() {
-    echo -e "ALERT: Loadwatch Triggered! Load: ($LOAD) Log: $DIR/$FILE" >> $DIR/$LOG
+    echo -e "ALERT: Loadwatch Triggered! - $DATE - Load: ($LOAD) - Log: $DIR/$FILE" >> $DIR/$LOG
     echo -e "=-=-=-=-=-=    BEGIN LOADWATCH REPORT - ${VERSION}  =-=-=-=-=-=\n" > $DIR/$FILE
 	echo $DATE >> $DIR/$FILE
 	echo $LOAD >> $DIR/$FILE

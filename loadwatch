@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 
 # CREDIT
-# Written by jonathonrox24 (https://github.com/jonathonrox24) and updated by Hummdis (hummdis.com).
+# Originally written by jonathonrox24 (https://github.com/jonathonrox24)
+# Udated by Hummdis (hummdis.com).
+
+# LICENSE
+# Released under the Apache License 2.0.
 
 ####
 # LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected or wanted.
 #
-# Version: 1.1.3
 #
 # INSTALLATION
 #
@@ -32,11 +35,8 @@
 #
 # CONFIGURATION
 #
-# Set the THRESH and RETEN variables at the top of the file to the desired numbers.
+# Set the THRESH and RETEN variables at the top of the file to the desired numbers to override the defaults.
 ####
-
-FILE=loadwatch.$(date +%F.%H.%M)
-DIR=/root/loadwatch
 
 # Change these two variables to override the defaults.
 # Load Threshold for doing a dump. Default is 50% of CPU for physical servers and a load average of 8 for virtual servers.
@@ -48,36 +48,74 @@ RETEN=
 # NO MORE CHANGES BELOW THIS POINT, UNLESS YOU KNOW WHAT YOU'RE DOING. #
 ########################################################################
 
+# Variables
+VERSION=1.1.4
+DATE=$(date +%F.%H%M)
+LOAD=$(cat /proc/loadavg | awk '{print $1}')
+FILE=loadwatch_$DATE_Load.$LOAD
+DIR=/root/loadwatch
+LOG=checklog
+DIVIDER="=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+# Make sure our operating directory exists.  By default, this file runs from within this directory, but is not required.
 if [ ! -d $DIR ]; then
     mkdir -p $DIR
 fi
 
-LOAD=$(cat /proc/loadavg | awk -F '.' '{print $1}')
-
-#echo `date +%F.%X` - Load: $LOAD >> $DIR/checklog
-
+# Gather the system stats and put them into the log.
 dump_stats() {
-    echo "Loadwatch tripped ($LOAD), dumping info to $DIR/$FILE" >> $DIR/checklog
-    echo $(date +%F.%H.%M) > $DIR/$FILE
+    echo -e "ALERT: Loadwatch Triggered! Load: ($LOAD) Log: $DIR/$FILE" >> $DIR/$LOG
+    echo -e "=-=-=-=-=-=    BEGIN LOADWATCH REPORT - ${VERSION}  =-=-=-=-=-=\n" > $DIR/$FILE
+	echo $DATE >> $DIR/$FILE
 	echo $LOAD >> $DIR/$FILE
-    free -m >> $DIR/$FILE
+    echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
+	echo "FREE RAM" >> $DIR/$FILE
+	free -m >> $DIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
+	echo "MySQL PROCCESS LIST" >> $DIR/$FILE
     mysqladmin processlist stat >> $DIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
+	echo "APACHE STATUS" >> $DIR/$FILE
     /usr/sbin/apachectl fullstatus >> $DIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
+	echo "NETSTAT DETAILS" >> $DIR/$FILE
     netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head >> $DIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
+	echo "TOP STATUS" >> $DIR/$FILE
     top -bcn1 >> $DIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
+	echo "PROCESS LIST" >> $DIR/$FILE
     ps auxf >> $DIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
+	echo "EXIM STATS" >> $DIR/$FILE
     /usr/sbin/exiwhat >> $DIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
+	echo "IOSTAT DETAILS" >> $DIR/$FILE
     iostat >> $DIR/$FILE
+	echo -e "\n=-=-=-=-=-=   END OF REPORT   =-=-=-=-=-=" >> $DIR/$FILE
 }
 
+# Perform cleanup. Check if the user has set a value. If not, default to 14.
 cleanup_files() {
     if [ -z "$RETEN" ]; then
         RETEN=14
     fi
     cd $DIR
-    find . -name loadwatch.* -mtime +$RETEN -exec rm -f {} \;
+    find . -name loadwatch_* -mtime +$RETEN -exec rm -f {} \;
+	
+	# Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
+	LINES=$(cat $DIR/checklog | wc -l)
+	if [ $(date +%H%M) == 0000 && $LINES > 5 ]; then
+		NEWLOG=$DIR/$LOG.$(date -d "yesterday" +%Y-%m-%d)
+		mv $LOG $NEWLOG
+		touch $LOG
+		gzip -f -9 $NEWLOG
+	fi
+	cd $DIR
+	find . -name checklog.* -mtime +$RETEN -exec rm -f {} \;
 }
 
+# Check for facter, needed to determine if system is physical or virtual. Abort if it's missing.
 facter_check() {
 	facter > /dev/null 2>&1
 	if [ $? -ne 0 ]; then
@@ -91,6 +129,7 @@ facter_check() {
 	fi
 }
 
+# Perform the actual virtual machine check
 virtual_check() {
 	facter_check
     if [ $(facter | grep is_virtual | awk '{print $3}') == 'true' ]; then
@@ -100,6 +139,7 @@ virtual_check() {
     fi
 }
 
+# See if the system can run the lscpu command.
 lscpu_check() {
 	lscpu > /dev/null 2>&1
 	if [ $? -eq 0 ]; then
@@ -109,7 +149,9 @@ lscpu_check() {
 	fi
 }
 
-run_job() {
+# Main process.
+main() {
+	echo "Loadwatch check: ${DATE} - Load: ${LOAD}" >> $DIR/checklog
 	if [ -z "$THRESH" ]; then
 		if [ virtual_check ]; then
 			MAX=16
@@ -120,13 +162,13 @@ run_job() {
 		fi
 		THRESH=$(expr $MAX / 2)
 	fi
-
-	if [ $LOAD -gt $THRESH ]; then
+	# Changing this actually allows comparison of decimal numbers.
+	if (( $(echo "$LOAD > $THRESH" | bc -l) )); then
 		dump_stats
 		cleanup_files
 	fi
 }
 
-run_job
+main
 
 exit 0

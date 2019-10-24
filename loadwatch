@@ -75,8 +75,8 @@ dump_stats() {
 	echo "MySQL PROCCESS LIST" >> $DIR/$FILE
     mysqladmin processlist stat >> $DIR/$FILE
 	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
-	echo "APACHE STATUS" >> $DIR/$FILE
-    /usr/sbin/apachectl fullstatus >> $DIR/$FILE
+	echo "APACHE STATUS AND CONNECTIONS PER DOMAIN" >> $DIR/$FILE
+    /usr/sbin/apachectl fullstatus | tee -a $DIR/$FILE | awk '{print $14}' | sort |sed -e 's/^[[:blank:]]*#.*//' -e '/^[[:blank:]]*$/d' | uniq -c | sort -n | grep -v VHost >> $DIR/$FILE
 	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
 	echo "NETSTAT DETAILS" >> $DIR/$FILE
     netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head >> $DIR/$FILE

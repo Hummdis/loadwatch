@@ -49,10 +49,10 @@ RETEN=
 ########################################################################
 
 # Variables
-VERSION=1.1.6
-DATE=$(date +%F.%H%M)
+VERSION=1.1.7
+DATE=$(date +%F-%H%M)
 LOAD=$(cat /proc/loadavg | awk '{print $1}')
-FILE=loadwatch_$DATE_Load.$LOAD
+FILE=loadwatch_${DATE}_Load_${LOAD}
 DIR=/root/loadwatch
 LOG=checklog
 DIVIDER="=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
@@ -105,7 +105,7 @@ cleanup_files() {
 	
 	# Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
 	LINES=$(cat $DIR/checklog | wc -l)
-	if [ $(date +%H%M) == 0000 && $LINES > 5 ]; then
+	if [ $(date +%H%M) == 0000 ] && [ $LINES -lt 5 ]; then
 		NEWLOG=$DIR/$LOG.$(date -d "yesterday" +%Y-%m-%d)
 		mv $LOG $NEWLOG
 		touch $LOG

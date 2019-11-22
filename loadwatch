@@ -99,21 +99,23 @@ dump_stats() {
 cleanup_files() {
     if [ -z "$RETEN" ]; then
         RETEN=14
-    fi
+    fi  
     cd $DIR
     find . -name loadwatch_* -mtime +$RETEN -exec rm -f {} \;
-	
-	# Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
-	LINES=$(cat $DIR/checklog | wc -l)
-	if [ $(date +%H%M) == 0000 ] && [ $LINES -lt 5 ]; then
-		NEWLOG=$DIR/$LOG.$(date -d "yesterday" +%Y-%m-%d)
-		mv $LOG $NEWLOG
-		touch $LOG
-		gzip -f -9 $NEWLOG
-	fi
-	cd $DIR
-	find . -name checklog.* -mtime +$RETEN -exec rm -f {} \;
+    
+    # Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
+    # If, however, the existing log is already small (less than 15 lines), keep it and wait until next time.
+    LINES=$(cat $DIR/checklog | wc -l)
+    if [ $(date +%H%M) == 0000 ] && [ $LINES -lt 15 ]; then
+        NEWLOG=$DIR/$LOG.$(date -d "yesterday" +%Y-%m-%d)
+        mv $LOG $NEWLOG
+        touch $LOG
+        gzip -f -9 $NEWLOG
+    fi  
+    cd $DIR
+    find . -name checklog.* -mtime +$RETEN -exec rm -f {} \;
 }
+
 
 # Check for facter, needed to determine if system is physical or virtual. Abort if it's missing.
 facter_check() {

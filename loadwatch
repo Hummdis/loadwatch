@@ -49,10 +49,10 @@ RETEN=
 ########################################################################
 
 # Variables
-VERSION=1.1.7
-DATE=$(date +%F-%H%M)
+VERSION=1.1.8
+DATE=$(date +%F.%k:%M)
 LOAD=$(cat /proc/loadavg | awk '{print $1}')
-FILE=loadwatch_${DATE}_Load_${LOAD}
+FILE=loadwatch_${DATE}_Load.${LOAD}.txt
 DIR=/root/loadwatch
 LOG=checklog
 DIVIDER="=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
@@ -75,8 +75,8 @@ dump_stats() {
 	echo "MySQL PROCCESS LIST" >> $DIR/$FILE
     mysqladmin processlist stat >> $DIR/$FILE
 	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
-	echo "APACHE STATUS AND CONNECTIONS PER DOMAIN" >> $DIR/$FILE
-    /usr/sbin/apachectl fullstatus | tee -a $DIR/$FILE | awk '{print $14}' | sort |sed -e 's/^[[:blank:]]*#.*//' -e '/^[[:blank:]]*$/d' | uniq -c | sort -n | grep -v VHost >> $DIR/$FILE
+	echo "APACHE STATUS" >> $DIR/$FILE
+    /usr/sbin/apachectl fullstatus >> $DIR/$FILE
 	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
 	echo "NETSTAT DETAILS" >> $DIR/$FILE
     netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head >> $DIR/$FILE
@@ -99,23 +99,21 @@ dump_stats() {
 cleanup_files() {
     if [ -z "$RETEN" ]; then
         RETEN=14
-    fi  
+    fi
     cd $DIR
     find . -name loadwatch_* -mtime +$RETEN -exec rm -f {} \;
-    
-    # Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
-    # If, however, the existing log is already small (less than 15 lines), keep it and wait until next time.
-    LINES=$(cat $DIR/checklog | wc -l)
-    if [ $(date +%H%M) == 0000 ] && [ $LINES -lt 15 ]; then
-        NEWLOG=$DIR/$LOG.$(date -d "yesterday" +%Y-%m-%d)
-        mv $LOG $NEWLOG
-        touch $LOG
-        gzip -f -9 $NEWLOG
-    fi  
-    cd $DIR
-    find . -name checklog.* -mtime +$RETEN -exec rm -f {} \;
+	
+	# Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
+	LINES=$(cat $DIR/checklog | wc -l)
+	if [ $(date +%H%M) == 0000 && $LINES > 5 ]; then
+		NEWLOG=$DIR/$LOG.$(date -d "yesterday" +%Y-%m-%d)
+		mv $LOG $NEWLOG
+		touch $LOG
+		gzip -f -9 $NEWLOG
+	fi
+	cd $DIR
+	find ${DIR} -type f -name checklog.* -mtime +$RETEN -exec rm -f {} \;
 }
-
 
 # Check for facter, needed to determine if system is physical or virtual. Abort if it's missing.
 facter_check() {
@@ -153,7 +151,7 @@ lscpu_check() {
 
 # Main process.
 main() {
-	echo "Loadwatch check: ${DATE} - Load: ${LOAD}" >> $DIR/checklog
+	echo "Loadwatch check: ${DATE} - Load: ${LOAD}" >> ${DIR}/checklog
 	if [ -z "$THRESH" ]; then
 		if [ virtual_check ]; then
 			MAX=16

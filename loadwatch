@@ -49,7 +49,7 @@ RETEN=
 ########################################################################
 
 # Variables
-VERSION=1.1.8
+VERSION=1.1.9
 DATE=$(date +%F.%k:%M)
 LOAD=$(cat /proc/loadavg | awk '{print $1}')
 FILE=loadwatch_${DATE}_Load.${LOAD}.txt
@@ -64,7 +64,7 @@ fi
 
 # Gather the system stats and put them into the log.
 dump_stats() {
-    echo -e "\tALERT: Loadwatch Triggered! - $DATE - Load: ($LOAD) - Log: $DIR/$FILE" >> $DIR/$LOG
+    echo -e "\tALERT: Loadwatch Triggered! - ${DATE} - Load: (${LOAD}) - Log: ${DIR}/${FILE}" >> $DIR/$LOG
     echo -e "=-=-=-=-=-=    BEGIN LOADWATCH REPORT - ${VERSION}  =-=-=-=-=-=\n" > $DIR/$FILE
 	echo $DATE >> $DIR/$FILE
 	echo $LOAD >> $DIR/$FILE
@@ -75,8 +75,8 @@ dump_stats() {
 	echo "MySQL PROCCESS LIST" >> $DIR/$FILE
     mysqladmin processlist stat >> $DIR/$FILE
 	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
-	echo "APACHE STATUS" >> $DIR/$FILE
-    /usr/sbin/apachectl fullstatus >> $DIR/$FILE
+	echo "APACHE STATUS AND CONNECTIONS PER DOMAIN" >> $DIR/$FILE
+    /usr/sbin/apachectl fullstatus | tee -a $DIR/$FILE | awk '{print $14}' | sort |sed -e 's/^[[:blank:]]*#.*//' -e '/^[[:blank:]]*$/d' | uniq -c | sort -n | grep -v VHost >> $DIR/$FILE
 	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
 	echo "NETSTAT DETAILS" >> $DIR/$FILE
     netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head >> $DIR/$FILE
@@ -97,19 +97,19 @@ dump_stats() {
 
 # Perform cleanup. Check if the user has set a value. If not, default to 14.
 cleanup_files() {
-    if [ -z "$RETEN" ]; then
+    if [ -z "${RETEN}" ]; then
         RETEN=14
     fi
-    cd $DIR
-    find . -name loadwatch_* -mtime +$RETEN -exec rm -f {} \;
+    cd ${DIR}
+    find ${DIR} -name loadwatch_* -mtime +${RETEN} -exec rm -f {} \;
 	
 	# Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
-	LINES=$(cat $DIR/checklog | wc -l)
-	if [ $(date +%H%M) == 0000 && $LINES > 5 ]; then
-		NEWLOG=$DIR/$LOG.$(date -d "yesterday" +%Y-%m-%d)
+	LINES=$(cat ${DIR}/checklog | wc -l)
+	if [ $(date +%H%M) == 0000 ] && [ ${LINES} -lt 15 ]; then
+		NEWLOG=${DIR}/${LOG}.$(date -d "yesterday" +%Y-%m-%d)
 		mv $LOG $NEWLOG
 		touch $LOG
-		gzip -f -9 $NEWLOG
+		gzip -f -9 ${NEWLOG}
 	fi
 	cd $DIR
 	find ${DIR} -type f -name checklog.* -mtime +$RETEN -exec rm -f {} \;
@@ -152,7 +152,7 @@ lscpu_check() {
 # Main process.
 main() {
 	echo "Loadwatch check: ${DATE} - Load: ${LOAD}" >> ${DIR}/checklog
-	if [ -z "$THRESH" ]; then
+	if [ -z "${THRESH}" ]; then
 		if [ virtual_check ]; then
 			MAX=16
 		elif [ lscpu_check ]; then
@@ -163,7 +163,7 @@ main() {
 		THRESH=$(expr $MAX / 2)
 	fi
 	# Changing this actually allows comparison of decimal numbers.
-	if (( $(echo "$LOAD > $THRESH" | bc -l) )); then
+	if (( $(echo "${LOAD} > ${THRESH}" | bc -l) )); then
 		dump_stats
 		cleanup_files
 	fi

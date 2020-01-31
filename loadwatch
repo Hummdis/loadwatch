@@ -52,8 +52,8 @@ AUTO_UPDATE="true"
 ########################################################################
 
 # Variables
-VERSION=1.2.0
-NEW_VER=$(curl -sL https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch | grep "VERSION=" | cut -d = -f 2)
+VERSION=1.2.1
+NEW_VER=$(curl -sL https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch | grep -m 1 "VERSION=" | cut -d = -f 2)
 DATE=$(date +%F.%H:%M)
 LOAD=$(cat /proc/loadavg | awk '{print $1}')
 FILE=loadwatch_${DATE}_Load.${LOAD}.txt
@@ -198,7 +198,8 @@ main() {
         1)  # If Auto Update is enabled, update. Otherwise, report a new version, but do nothing else.
             if [[$AUTO_UPDATE == "true" ]]; then
                 echo "Update Check - Auto Update enabled.  Updating to v${NEW_VER}" >> $DIR/$LOG
-                wget -O $DIR/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x $DIR/loadwatch
+                wget -O $DIR/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch
+                chmod +x $DIR/loadwatch
             else
                 echo "Update Check - LoadWatch v${NEW_VER} available. Auto Update disabled." >> $DIR/$LOG
             fi
@@ -235,7 +236,8 @@ main() {
 case $1 in
     update)
         echo "Running LoadWatch manual update..."
-        wget -O $DIR/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x $DIR/loadwatch
+        wget -O $DIR/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch
+        chmod +x $DIR/loadwatch
         echo "LoadWatch update complete."
         ;;
     *)

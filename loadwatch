@@ -44,7 +44,7 @@ THRESH=
 # Retention duration of log files. Default is 14 days.
 RETEN=
 # By default, LoadWatch auto-updates. To turn this off, change this to "false".
-AUTO_UPDATE="true"
+AUTO_UPDATE='true'
 
 
 ########################################################################
@@ -52,7 +52,7 @@ AUTO_UPDATE="true"
 ########################################################################
 
 # Variables
-VERSION=1.2.1
+VERSION=1.2.2
 NEW_VER=$(curl -sL https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch | grep -m 1 "VERSION=" | cut -d = -f 2)
 DATE=$(date +%F.%H:%M)
 LOAD=$(cat /proc/loadavg | awk '{print $1}')
@@ -196,7 +196,7 @@ main() {
         0)  # No update available. Do nothing.
             ;;
         1)  # If Auto Update is enabled, update. Otherwise, report a new version, but do nothing else.
-            if [[$AUTO_UPDATE == "true" ]]; then
+            if [[ $AUTO_UPDATE == 'true' ]]; then
                 echo "Update Check - Auto Update enabled.  Updating to v${NEW_VER}" >> $DIR/$LOG
                 wget -O $DIR/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch
                 chmod +x $DIR/loadwatch

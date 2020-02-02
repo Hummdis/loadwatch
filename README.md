@@ -3,7 +3,7 @@ Linux System LoadWatch
 
 LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected or wanted.
 
-#### Version: 1.2.1
+#### Version: 1.2.3
 
 ## INSTALLATION
 

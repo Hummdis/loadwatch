@@ -52,8 +52,8 @@ AUTO_UPDATE='true'
 ########################################################################
 
 # Variables
-VERSION=1.2.2
-NEW_VER=$(curl -sL https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch | grep -m 1 "VERSION=" | cut -d = -f 2)
+VERSION=1.2.3
+NEW_VER=$(cat /tmp/loadwatch | grep -m 1 "VERSION=" | cut -d = -f 2)
 DATE=$(date +%F.%H:%M)
 LOAD=$(cat /proc/loadavg | awk '{print $1}')
 FILE=loadwatch_${DATE}_Load.${LOAD}.txt
@@ -191,6 +191,7 @@ main() {
 	echo "LoadWatch v${VERSION} - Timestamp: ${DATE} - Load: ${LOAD}" >> $DIR/$LOG
 
     # Perform update check.
+    wget -O /tmp/loadwatch -q https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch
     update_check ${NEW_VER} ${VERSION}
     case $? in
         0)  # No update available. Do nothing.

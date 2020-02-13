@@ -16,12 +16,18 @@ LoadWatch - A more lightweight version of Sys-Snap and only triggers when the lo
  - Fedora: `sudo dnf install facter`
  - CentOS, RHEL: `sudo yum install epel-release && sudo yum install facter`
  - openSUSE: `sudo zypper install facter`
-
-3. Create the following CRON entry in Root's crontab:
+ 
+3. Install `bc`. 
+ - Arch Linux, Manjaro Linux: `sudo pacman -S bc`
+ - Fedora: `sudo dnf install bc`
+ - CentOS, RHEL: `sudo yum install bc`
+ - openSUSE: `sudo zypper install bc`
+ 
+4. Create the following CRON entry in Root's crontab:
 
        */1 * * * * /root/loadwatch/loadwatch
 
-4. You're done.  LoadWatch will run every minute (unless you change the CRON) and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.  If the server is a virtual machine (i.e. VPS), then the maximum load is 5 with a reported load of 2 or higher. This can be overridden, of course.  It then cleans up any old log files older than 14 days with each run to ensure no logs are kept longer than the defined retention period.
+5. You're done.  LoadWatch will run every minute (unless you change the CRON) and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.  If the server is a virtual machine (i.e. VPS), then the maximum load is 5 with a reported load of 2 or higher. This can be overridden, of course.  It then cleans up any old log files older than 14 days with each run to ensure no logs are kept longer than the defined retention period.
 
 ## CONFIGURATION
 

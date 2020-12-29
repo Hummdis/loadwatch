@@ -52,7 +52,7 @@ AUTO_UPDATE='true'
 ########################################################################
 
 # Variables
-readonly VERSION=1.3.0
+readonly VERSION=1.3.1
 readonly DATE=$(date +%F.%H:%M)
 readonly LOAD=$(cat /proc/loadavg | awk '{print $1}')
 readonly FILE=loadwatch_${DATE}_Load.${LOAD}.log
@@ -118,6 +118,13 @@ cleanup_files() {
     if test -f /root/loadwatch/checklog; then
         mv /root/loadwatch/checklog* $LOGDIR/ > /dev/null 2>&1
         mv /root/loadwatch/loadwatch_* $LOGDIR/ > /dev/null 2>&1
+    fi
+    
+    # Don't break the current CRON entry, make a symlink.
+    if [ ! -h /root/loadwatch/loadwatch ]; then
+        rm -f /root/loadwatch/loadwatch
+        ln -s $DIR/loadwatch /root/loadwatch/loadwatch
+        touch /root/loadwatch/01_UPDATE_CRON_BEFORE_DELETING_SYMLINK
     fi
     
     # Cleanup the loadwatch_ log files.
@@ -224,12 +231,6 @@ update_check() {
                 echo "Update Check - Auto Update enabled.  Updating to v${NEW_VER}" >> $LOGDIR/$LOG
                 mv $TMPFILE $DIR/loadwatch
                 chmod +x $DIR/loadwatch
-                # Don't break the current CRON entry, make a symlink.
-                if [ ! -h /root/loadwatch/loadwatch ]; then
-                    rm -f /root/loadwatch/loadwatch
-                    ln -s $DIR/loadwatch /root/loadwatch/loadwatch
-                    touch /root/loadwatch/01_UPDATE_CRON_BEFORE_DELETING_SYMLINK
-                fi
             else
                 echo "Update Check - LoadWatch v${NEW_VER} available. Auto Update disabled." >> $LOGDIR/$LOG
             fi

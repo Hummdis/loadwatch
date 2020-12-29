@@ -3,13 +3,13 @@ Linux System LoadWatch
 
 LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected or wanted.
 
-#### Version: 1.2.3
+#### Version: 1.3.0
 
 ## INSTALLATION
 
 1. Run the following command, as Root:
 
-       mkdir -p ~/loadwatch; wget -O ~/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x ~/loadwatch/loadwatch
+       mkdir -p /opt/loadwatch; wget -O /opt/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x /opt/loadwatch/loadwatch
 
 2. Install `facter`.  You can install it with the proper package manager for your distribution:
  - Arch Linux, Manjaro Linux: `sudo pacman -S facter`
@@ -19,7 +19,7 @@ LoadWatch - A more lightweight version of Sys-Snap and only triggers when the lo
 
 3. Create the following CRON entry in Root's crontab:
 
-       */1 * * * * /root/loadwatch/loadwatch
+       */1 * * * * /opt/loadwatch/loadwatch
 
 4. You're done.  LoadWatch will run every minute (unless you change the CRON) and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.  If the server is a virtual machine (i.e. VPS), then the maximum load is 5 with a reported load of 2 or higher. This can be overridden, of course.  It then cleans up any old log files older than 14 days with each run to ensure no logs are kept longer than the defined retention period.
 
@@ -41,7 +41,9 @@ If the Auto-Update option is disabled, a manual update may be performed by runni
 
 ## REVIEWING REPORTS
 
-When it's time to review reports, the easiest way to see what the load was, and when, is to view the `checklog`.  There are timestamps with each check and what the load was at the time of that check. Once the threshold value has been reached it will trigger a dump of the information and that's where the individual `loadwatch_DATE.TIME.LOAD.txt` files come into play.  All dates that LoadWatch reports are in ISO 8601 date format of YYYY-MM-DD.
+Log folder: `/var/log/loadwatch`
+
+When it's time to review reports, the easiest way to see what the load was, and when, is to tail the `/var/log/loadwatch/checklog` file.  There are timestamps with each check and what the load was at the time of that check. Once the threshold value has been reached it will trigger a dump of the information and that's where the individual `/var/log/loadwatch/loadwatch_DATE.TIME.LOAD.txt` files come into play.  All dates that LoadWatch reports are in ISO 8601 date format of YYYY-MM-DD.
 
 ## Planned Changes
 

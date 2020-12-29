@@ -52,51 +52,58 @@ AUTO_UPDATE='true'
 ########################################################################
 
 # Variables
-VERSION=1.2.3
-NEW_VER=$(cat /tmp/loadwatch | grep -m 1 "VERSION=" | cut -d = -f 2)
-DATE=$(date +%F.%H:%M)
-LOAD=$(cat /proc/loadavg | awk '{print $1}')
-FILE=loadwatch_${DATE}_Load.${LOAD}.txt
-DIR=/root/loadwatch
-LOG=checklog
-DIVIDER="=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+readonly VERSION=1.3.0
+readonly DATE=$(date +%F.%H:%M)
+readonly LOAD=$(cat /proc/loadavg | awk '{print $1}')
+readonly FILE=loadwatch_${DATE}_Load.${LOAD}.log
+readonly DIR=/opt/loadwatch
+readonly LOGDIR=/var/log/loadwatch
+readonly LOG=checklog
+readonly TMPFILE=${DIR}/.loadwatch
+readonly RAWURL=https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch
+readonly DIVIDER="=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
 # Make sure our operating directory exists.  By default, this file runs from within this directory, but is not required.
 if [ ! -d $DIR ]; then
     mkdir -p $DIR
 fi
 
+if [ ! -d $LOGDIR ]; then
+    mkdir -p $LOGDIR
+fi
+
 # Gather the system stats and put them into the log.
 dump_stats() {
-    echo -e "ALERT: Loadwatch Triggered! - Timestamp: ${DATE} - Load: ${LOAD} - Log: ${DIR}/${FILE}" >> $DIR/$LOG
-    echo -e "=-=-=-=-=-=    BEGIN LOADWATCH REPORT - ${VERSION}  =-=-=-=-=-=\n" > $DIR/$FILE
-	echo $DATE >> $DIR/$FILE
-	echo $LOAD >> $DIR/$FILE
-    echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
-	echo "FREE RAM" >> $DIR/$FILE
-	free -m >> $DIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
-	echo "MySQL PROCCESS LIST" >> $DIR/$FILE
-    mysqladmin processlist stat >> $DIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
-	echo "APACHE STATUS AND CONNECTIONS PER DOMAIN" >> $DIR/$FILE
-    /usr/sbin/apachectl fullstatus | tee -a $DIR/$FILE | awk '{print $14}' | sort |sed -e 's/^[[:blank:]]*#.*//' -e '/^[[:blank:]]*$/d' | uniq -c | sort -n | grep -v VHost >> $DIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
-	echo "NETSTAT DETAILS" >> $DIR/$FILE
-    netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head >> $DIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
-	echo "TOP STATUS" >> $DIR/$FILE
-    top -bcn 1 >> $DIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
-	echo "PROCESS LIST" >> $DIR/$FILE
-    ps auxf >> $DIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
-	echo "EXIM STATS" >> $DIR/$FILE
-    /usr/sbin/exiwhat >> $DIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $DIR/$FILE
-	echo "IOSTAT DETAILS" >> $DIR/$FILE
-    iostat >> $DIR/$FILE
-	echo -e "\n=-=-=-=-=-=   END OF REPORT   =-=-=-=-=-=" >> $DIR/$FILE
+    echo -e "ALERT: Loadwatch Triggered! - Timestamp: ${DATE} - Load: ${LOAD} - Log: ${DIR}/${FILE}" >> $LOGDIR/$LOG
+    echo -e "=-=-=-=-=-=    BEGIN LOADWATCH REPORT - ${VERSION}  =-=-=-=-=-=\n" > $LOGDIR/$FILE
+	echo $DATE >> $LOGDIR/$FILE
+	echo $LOAD >> $LOGDIR/$FILE
+    echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+	echo "FREE RAM" >> $LOGDIR/$FILE
+	free -m >> $LOGDIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+	echo "MySQL PROCCESS LIST" >> $LOGDIR/$FILE
+    mysqladmin processlist stat >> $LOGDIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+	echo "APACHE STATUS AND CONNECTIONS PER DOMAIN" >> $LOGDIR/$FILE
+    /usr/sbin/apachectl fullstatus | tee -a $LOGDIR/$FILE | awk '{print $14}' | sort |sed -e 's/^[[:blank:]]*#.*//' -e '/^[[:blank:]]*$/d' | uniq -c | sort -n | grep -v VHost >> $LOGDIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+	echo "NETSTAT DETAILS" >> $LOGDIR/$FILE
+    netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head >> $LOGDIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+	echo "TOP STATUS" >> $LOGDIR/$FILE
+	# Make sure the COLUMNS system value is set to 1000 before running TOP to make sure we get the full command being run.
+	COLUMNS=1000; top -bcn 1 >> $LOGDIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+	echo "PROCESS LIST" >> $LOGDIR/$FILE
+    ps auxf >> $LOGDIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+	echo "EXIM STATS" >> $LOGDIR/$FILE
+    /usr/sbin/exiwhat >> $LOGDIR/$FILE
+	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+	echo "IOSTAT DETAILS" >> $LOGDIR/$FILE
+    iostat >> $LOGDIR/$FILE
+	echo -e "\n=-=-=-=-=-=   END OF REPORT   =-=-=-=-=-=" >> $LOGDIR/$FILE
 }
 
 # Perform cleanup. Check if the user has set a value. If not, default to 14.
@@ -104,16 +111,27 @@ cleanup_files() {
     if [ -z "${RETEN}" ]; then
         RETEN=14
     fi
-    find $DIR -name 'loadwatch_*' -mtime +$RETEN -exec rm -f {} \;
-	
+
+    # Starting in version 1.3.0, the log path is /var/log/loadwatch.  Move any log
+    # files from the old path to the new.  If the checklog file exists here then
+    # all other files exist here as well, so move them all.
+    if test -f /root/loadwatch/checklog; then
+        mv /root/loadwatch/checklog* $LOGDIR/ > /dev/null 2>&1
+        mv /root/loadwatch/loadwatch_* $LOGDIR/ > /dev/null 2>&1
+    fi
+    
+    # Cleanup the loadwatch_ log files.
+    find $LOGDIR -name 'loadwatch_*' -mtime +${RETEN} -exec rm -f {} \;
+
 	# Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
 	if [ $(date +%H%M) == 0000 ]; then
-		NEWLOG=${DIR}/${LOG}.$(date -d "yesterday" +%Y-%m-%d)
-		mv $LOG $NEWLOG
-		touch $LOG
+		NEWLOG=${LOGDIR}/${LOG}.$(date -d "yesterday" +%Y-%m-%d)
+		mv $LOGDIR $NEWLOG
+		touch $LOGDIR
 		gzip -f -9 ${NEWLOG}
 	fi
-	find $DIR -type f -name '${LOG.}*' -mtime +$RETEN -exec rm -f {} \;
+	find $LOGDIR -type f -name '${LOG.}*' -mtime +${RETEN} -exec rm -f {} \;
+
 }
 
 # Check for facter, needed to determine if system is physical or virtual. Abort if it's missing.
@@ -150,8 +168,8 @@ lscpu_check() {
 	fi
 }
 
-# Check for updates to LoadWatch
-update_check() {
+# Compare the versions of LoadWatch
+compare_versions() {
     # This will return the following numbers for the two arguments passed.
     # 0 if $1 = $2
     # 1 if $1 > $2
@@ -186,32 +204,51 @@ update_check() {
     return 0
 }
 
-# Main process.
-main() {
-	echo "LoadWatch v${VERSION} - Timestamp: ${DATE} - Load: ${LOAD}" >> $DIR/$LOG
-
-    # Perform update check.
-    wget -O /tmp/loadwatch -q https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch
-    update_check ${NEW_VER} ${VERSION}
+# Update Check
+update_check() {
+    # Perform update check
+    # Only download the file every 6 hours to reduce the number of times this is done.
+    if [[ ! -e ${TMPFILE} ]]; then
+        wget -O ${TMPFILE} -q ${RAWURL}
+    elif test `find ${TMPFILE} -mmin +360`; then
+        rm -f ${TMPFILE}
+        wget -O ${TMPFILE} -q ${RAWURL}
+    fi
+    readonly NEW_VER=$(cat ${TMPFILE} | grep -m 1 "VERSION=" | cut -d = -f 2)
+    compare_versions ${NEW_VER} ${VERSION}
     case $? in
         0)  # No update available. Do nothing.
             ;;
         1)  # If Auto Update is enabled, update. Otherwise, report a new version, but do nothing else.
             if [[ $AUTO_UPDATE == 'true' ]]; then
-                echo "Update Check - Auto Update enabled.  Updating to v${NEW_VER}" >> $DIR/$LOG
-                wget -O $DIR/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch
+                echo "Update Check - Auto Update enabled.  Updating to v${NEW_VER}" >> $LOGDIR/$LOG
+                mv $TMPFILE $DIR/loadwatch
                 chmod +x $DIR/loadwatch
+                # Don't break the current CRON entry, make a symlink.
+                if [ ! -h /root/loadwatch/loadwatch ]; then
+                    rm -f /root/loadwatch/loadwatch
+                    ln -s $DIR/loadwatch /root/loadwatch/loadwatch
+                    touch /root/loadwatch/01_UPDATE_CRON_BEFORE_DELETING_SYMLINK
+                fi
             else
-                echo "Update Check - LoadWatch v${NEW_VER} available. Auto Update disabled." >> $DIR/$LOG
+                echo "Update Check - LoadWatch v${NEW_VER} available. Auto Update disabled." >> $LOGDIR/$LOG
             fi
             ;;
         2)  # The public version is older than the current version.
-            echo "Update Check - Running LoadWatch version is ${VERSION}, but published version is ${NEW_VER}. Is this a pre-release?" >> $DIR/$LOG
+            echo "Update Check - Running LoadWatch version is ${VERSION}, but published version is ${NEW_VER}. Is this a pre-release?" >> $LOGDIR/$LOG
             ;;
         *)  # All other values are invalid. Report, but don't cause the program to abort.
-            echo "Update Check - LoadWatch Update Check returned an invalid code ($?). Skipping update." >> $DIR/$LOG
+            echo "Update Check - LoadWatch Update Check returned an invalid code ($?). Skipping update." >> $LOGDIR/$LOG
             ;;
     esac
+}
+
+# Main process.
+main() {
+	echo "LoadWatch v${VERSION} - Timestamp: ${DATE} - Load: ${LOAD}" >> $LOGDIR/$LOG
+
+    # Perform update check
+    update_check
 
     # Perform the actual work.
 	if [ -z "${THRESH}" ]; then
@@ -237,7 +274,7 @@ main() {
 case $1 in
     update)
         echo "Running LoadWatch manual update..."
-        wget -O $DIR/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch
+        wget -O $DIR/loadwatch ${RAWURL}
         chmod +x $DIR/loadwatch
         echo "LoadWatch update complete."
         ;;

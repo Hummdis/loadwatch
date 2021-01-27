@@ -52,7 +52,7 @@ AUTO_UPDATE='true'
 ########################################################################
 
 # Variables
-readonly VERSION=1.3.3
+readonly VERSION=1.3.4
 readonly DATE=$(date +%F.%H:%M)
 readonly LOAD=$(cat /proc/loadavg | awk '{print $1}')
 readonly FILE=loadwatch_${DATE}_Load.${LOAD}.log
@@ -120,8 +120,8 @@ cleanup_files() {
         mv /root/loadwatch/loadwatch_* $LOGDIR/ > /dev/null 2>&1
     fi
     
-    # Don't break the current CRON entry, make a symlink.
-    if [ ! -h /root/loadwatch/loadwatch ]; then
+    # Don't break the current CRON entry, make a symlink, if the old path exists.
+    if [ -h /root/loadwatch/loadwatch ]; then
         rm -f /root/loadwatch/loadwatch
         ln -s $DIR/loadwatch /root/loadwatch/loadwatch
         touch /root/loadwatch/01_UPDATE_CRON_BEFORE_DELETING_SYMLINK
@@ -133,7 +133,7 @@ cleanup_files() {
 	# Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
 	if [ $(date +%H%M) == 0000 ]; then
 		NEWLOG=${LOGDIR}/${LOG}.$(date -d "yesterday" +%Y-%m-%d)
-		mv $LOGDIR $NEWLOG
+		mv ${LOGDIR}/${LOG} ${NEWLOG}
 		touch $LOGDIR
 		gzip -f -9 ${NEWLOG}
 	fi

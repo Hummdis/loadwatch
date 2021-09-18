@@ -47,8 +47,10 @@ IFS=$'\n\t'
 # Change these two variables to override the defaults.
 # Load Threshold for doing a dump. Default is 50% of CPU for physical servers and a load average of 8 for virtual servers.
 THRESH=0  # <- Set to 0 so always generates a log for testing. - Alex Kr
+#echo "DEBUG: THRESH=${THRESH}" 1>&2
 # Memory threshold for doing a dump. Default is...
-MEM_THRESH=
+MEM_THRESH=0 # <- Set to 0 so always triggers when testing. - Alex Kr
+#echo "DEBUG: MEM_THRESH=${MEM_THRESH}" 1>&2
 # Retention duration of log files. Default is 14 days.
 RETEN=
 # To turn on auto-updates change this to true
@@ -61,8 +63,12 @@ AUTO_UPDATE='false'
 
 # Variables
 readonly VERSION=1.3.4
-readonly DATE=$(date +%F.%H:%M)
+readonly DATE=$(date +%F_%H.%M) # <- Change formatting to exclude ':' - Alex Kr
 readonly LOAD=$(cat /proc/loadavg | awk '{print $1}')
+#echo "DEBUG: LOAD=${LOAD}" 1>&2
+# MEM is a percentage of memory used expressed as a float. Ex: 26.29
+readonly MEM=$(free -t | awk 'NR == 2 {printf("%.2f"), $3/$2*100}')
+#echo "DEBUG: MEM=${MEM}" 1>&2
 readonly FILE=loadwatch_${DATE}_Load.${LOAD}.log
 readonly DIR=/opt/loadwatch
 readonly LOGDIR=/var/log/loadwatch
@@ -258,17 +264,23 @@ update_check() {
 
 # Main process.
 main() {
+echo 'DEBUG: main() triggered' 1>&2
   echo "LoadWatch v${VERSION} - Timestamp: ${DATE} - Load: ${LOAD}" >> $LOGDIR/$LOG
 
   # Perform update check
-  crontab -l | grep loadwatch | grep root > /dev/null
-  if [ "$?" == 0 ]; then
+#  $(crontab -l | grep loadwatch | grep root > /dev/null)
+# ^ Because this pipe exits as 1 when nothing is found, causes script to exit
+# prematurely in bash hard-mode. 1 is an error. We need to evaluate the 
+# expression in the if statement instead. - Alex Kr
+  if $(crontab -l | grep loadwatch | grep root > /dev/null); then
+#echo "DEBUG: UPDATE NOTICE triggered." 1>&2
     echo "UPDATE NOTICE: Old CRON entry found! Update the Crontab entry to the new path of /opt/loadwatch/loadwatch" >> $LOGDIR/$LOG
   fi
   update_check
 
   # Perform the actual work.
   if [ -z "${THRESH}" ]; then
+#echo "DEBUG: THRESH is *not* set." 1>&2
     if [ virtual_check ]; then
       MAX=5
     elif [ lscpu_check ]; then
@@ -277,18 +289,31 @@ main() {
       MAX=$(cat /proc/cpuinfo | grep "cpu cores" | tail -1 | awk '{print $4}')
     fi
     THRESH=$(expr $MAX / 2)
+  elif [ -z "${MEM_THRESH}" ]; then
+#echo "DEBUG: MEM_THRESH is *not* set." 1>&2
+    MEM_THRESH=50
+  else
+#echo "DEBUG: THRESH and MEM_THRESH are both set." 1>&2
   fi
 
   # Written this way is allows comparison of decimal numbers.
+#echo "DEBUG: LOAD Expression evaluates to: $(echo "${LOAD} > ${THRESH}" | bc -l)" 1>&2
+#echo "DEBUG: MEM expression evaluates to: $(echo "${MEM} > ${MEM_THRESH}" | bc -l)" 1>&2
   if (( $(echo "${LOAD} > ${THRESH}" | bc -l) )); then
+#echo "DEBUG: THRESH is < LOAD." 1>&2
     dump_stats
+  elif (( $(echo "${MEM} > ${MEM_THRESH}" | bc -l) )); then
+#echo "DEBUG: MEM is < MEM_THRESH." 1>&2
+    dump_stats
+  else
+#echo "DEBUG: Neither LOAD > THRESH nor MEM > MEM_THRESH" 1>&2
   fi
 
   # Always perform cleaup to keep with retention settings.
   cleanup_files
 }
 
-case $1 in
+case ${1-default} in  # Set a default expansion to avoid failures in bash hard-mode
   update)
     echo "Running LoadWatch manual update..."
     wget -O $DIR/loadwatch ${RAWURL}

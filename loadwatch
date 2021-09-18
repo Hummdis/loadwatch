@@ -41,10 +41,12 @@
 # Change these two variables to override the defaults.
 # Load Threshold for doing a dump. Default is 50% of CPU for physical servers and a load average of 8 for virtual servers.
 THRESH=
+# Memory threshold for doing a dump. Default is...
+MEM_THRESH=
 # Retention duration of log files. Default is 14 days.
 RETEN=
-# By default, LoadWatch auto-updates. To turn this off, change this to "false".
-AUTO_UPDATE='true'
+# To turn on auto-updates change this to true
+AUTO_UPDATE='false'
 
 
 ########################################################################
@@ -65,227 +67,227 @@ readonly DIVIDER="=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 # Make sure our operating directory exists.  By default, this file runs from within this directory, but is not required.
 if [ ! -d $DIR ]; then
-    mkdir -p $DIR
+  mkdir -p $DIR
 fi
 
 if [ ! -d $LOGDIR ]; then
-    mkdir -p $LOGDIR
+  mkdir -p $LOGDIR
 fi
 
 # Gather the system stats and put them into the log.
 dump_stats() {
-    echo -e "ALERT: Loadwatch Triggered! - Timestamp: ${DATE} - Load: ${LOAD} - Log: ${DIR}/${FILE}" >> $LOGDIR/$LOG
-    echo -e "=-=-=-=-=-=    BEGIN LOADWATCH REPORT - ${VERSION}  =-=-=-=-=-=\n" > $LOGDIR/$FILE
-	echo $DATE >> $LOGDIR/$FILE
-	echo $LOAD >> $LOGDIR/$FILE
-    echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-	echo "FREE RAM" >> $LOGDIR/$FILE
-	free -m >> $LOGDIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-	echo "MySQL PROCCESS LIST" >> $LOGDIR/$FILE
-    mysqladmin processlist stat >> $LOGDIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-	echo "APACHE STATUS AND CONNECTIONS PER DOMAIN" >> $LOGDIR/$FILE
-    /usr/sbin/apachectl fullstatus | tee -a $LOGDIR/$FILE | awk '{print $14}' | sort |sed -e 's/^[[:blank:]]*#.*//' -e '/^[[:blank:]]*$/d' | uniq -c | sort -n | grep -v VHost >> $LOGDIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-	echo "NETSTAT DETAILS" >> $LOGDIR/$FILE
-    netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head >> $LOGDIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-	echo "TOP STATUS" >> $LOGDIR/$FILE
-	# Make sure the COLUMNS system value is set to 1000 before running TOP to make sure we get the full command being run.
-	COLUMNS=1000; top -bcn 1 >> $LOGDIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-	echo "PROCESS LIST" >> $LOGDIR/$FILE
-    ps auxf >> $LOGDIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-	echo "EXIM STATS" >> $LOGDIR/$FILE
-    /usr/sbin/exiwhat >> $LOGDIR/$FILE
-	echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-	echo "IOSTAT DETAILS" >> $LOGDIR/$FILE
-    iostat >> $LOGDIR/$FILE
-	echo -e "\n=-=-=-=-=-=   END OF REPORT   =-=-=-=-=-=" >> $LOGDIR/$FILE
+  echo -e "ALERT: Loadwatch Triggered! - Timestamp: ${DATE} - Load: ${LOAD} - Log: ${DIR}/${FILE}" >> $LOGDIR/$LOG
+  echo -e "=-=-=-=-=-=    BEGIN LOADWATCH REPORT - ${VERSION}  =-=-=-=-=-=\n" > $LOGDIR/$FILE
+  echo $DATE >> $LOGDIR/$FILE
+  echo $LOAD >> $LOGDIR/$FILE
+  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+  echo "FREE RAM" >> $LOGDIR/$FILE
+  free -m >> $LOGDIR/$FILE
+  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+  echo "MySQL PROCCESS LIST" >> $LOGDIR/$FILE
+  mysqladmin processlist stat >> $LOGDIR/$FILE
+  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+  echo "APACHE STATUS AND CONNECTIONS PER DOMAIN" >> $LOGDIR/$FILE
+  /usr/sbin/apachectl fullstatus | tee -a $LOGDIR/$FILE | awk '{print $14}' | sort |sed -e 's/^[[:blank:]]*#.*//' -e '/^[[:blank:]]*$/d' | uniq -c | sort -n | grep -v VHost >> $LOGDIR/$FILE
+  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+  echo "NETSTAT DETAILS" >> $LOGDIR/$FILE
+  netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head >> $LOGDIR/$FILE
+  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+  echo "TOP STATUS" >> $LOGDIR/$FILE
+  # Make sure the COLUMNS system value is set to 1000 before running TOP to make sure we get the full command being run.
+  COLUMNS=1000; top -bcn 1 >> $LOGDIR/$FILE
+  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+  echo "PROCESS LIST" >> $LOGDIR/$FILE
+  ps auxf >> $LOGDIR/$FILE
+  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+  echo "EXIM STATS" >> $LOGDIR/$FILE
+  /usr/sbin/exiwhat >> $LOGDIR/$FILE
+  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
+  echo "IOSTAT DETAILS" >> $LOGDIR/$FILE
+  iostat >> $LOGDIR/$FILE
+  echo -e "\n=-=-=-=-=-=   END OF REPORT   =-=-=-=-=-=" >> $LOGDIR/$FILE
 }
 
 # Perform cleanup. Check if the user has set a value. If not, default to 14.
 cleanup_files() {
-    if [ -z "${RETEN}" ]; then
-        RETEN=14
-    fi
+  if [ -z "${RETEN}" ]; then
+    RETEN=14
+  fi
 
-    # Starting in version 1.3.0, the log path is /var/log/loadwatch.  Move any log
-    # files from the old path to the new.  If the checklog file exists here then
-    # all other files exist here as well, so move them all.
-    if test -f /root/loadwatch/checklog; then
-        mv /root/loadwatch/checklog* $LOGDIR/ > /dev/null 2>&1
-        mv /root/loadwatch/loadwatch_* $LOGDIR/ > /dev/null 2>&1
-    fi
-    
-    # Don't break the current CRON entry, make a symlink, if the old path exists.
-    if [ -h /root/loadwatch/loadwatch ]; then
-        rm -f /root/loadwatch/loadwatch
-        ln -s $DIR/loadwatch /root/loadwatch/loadwatch
-        touch /root/loadwatch/01_UPDATE_CRON_BEFORE_DELETING_SYMLINK
-    fi
-    
-    # Cleanup the loadwatch_ log files.
-    find $LOGDIR -name 'loadwatch_*' -mtime +${RETEN} -exec rm -f {} \;
+  # Starting in version 1.3.0, the log path is /var/log/loadwatch.  Move any log
+  # files from the old path to the new.  If the checklog file exists here then
+  # all other files exist here as well, so move them all.
+  if test -f /root/loadwatch/checklog; then
+    mv /root/loadwatch/checklog* $LOGDIR/ > /dev/null 2>&1
+    mv /root/loadwatch/loadwatch_* $LOGDIR/ > /dev/null 2>&1
+  fi
 
-	# Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
-	if [ $(date +%H%M) == 0000 ]; then
-		NEWLOG=${LOGDIR}/${LOG}.$(date -d "yesterday" +%Y-%m-%d)
-		mv ${LOGDIR}/${LOG} ${NEWLOG}
-		touch $LOGDIR
-		gzip -f -9 ${NEWLOG}
-	fi
-	find $LOGDIR -type f -name '${LOG.}*' -mtime +${RETEN} -exec rm -f {} \;
+  # Don't break the current CRON entry, make a symlink, if the old path exists.
+  if [ -h /root/loadwatch/loadwatch ]; then
+    rm -f /root/loadwatch/loadwatch
+    ln -s $DIR/loadwatch /root/loadwatch/loadwatch
+    touch /root/loadwatch/01_UPDATE_CRON_BEFORE_DELETING_SYMLINK
+  fi
+
+  # Cleanup the loadwatch_ log files.
+  find $LOGDIR -name 'loadwatch_*' -mtime +${RETEN} -exec rm -f {} \;
+
+  # Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
+  if [ $(date +%H%M) == 0000 ]; then
+    NEWLOG=${LOGDIR}/${LOG}.$(date -d "yesterday" +%Y-%m-%d)
+    mv ${LOGDIR}/${LOG} ${NEWLOG}
+    touch $LOGDIR
+    gzip -f -9 ${NEWLOG}
+  fi
+  find $LOGDIR -type f -name '${LOG.}*' -mtime +${RETEN} -exec rm -f {} \;
 
 }
 
 # Check for facter, needed to determine if system is physical or virtual. Abort if it's missing.
 facter_check() {
-	facter > /dev/null 2>&1
-	if [ $? -ne 0 ]; then
-		echo "Facter is not installed. Please install it with the proper package manager for your distribution:"
-		echo -e "\tsudo pacman -S facter"
-		echo -e "\tsudo dnf install facter"
-		echo -e "\tyum install epel-release && yum install fracter"
-		echo -e "\tzypper install facter"
-		echo -e "\n\nExiting."
-		exit 1
-	fi
+  facter > /dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    echo "Facter is not installed. Please install it with the proper package manager for your distribution:"
+    echo -e "\tsudo pacman -S facter"
+    echo -e "\tsudo dnf install facter"
+    echo -e "\tyum install epel-release && yum install fracter"
+    echo -e "\tzypper install facter"
+    echo -e "\n\nExiting."
+    exit 1
+  fi
 }
 
 # Perform the actual virtual machine check
 virtual_check() {
-	facter_check
-    if [ $(facter | grep is_virtual | awk '{print $3}') == 'true' ]; then
-        return 0 # True
-    else
-        return 1 # False
-    fi
+  facter_check
+  if [ $(facter | grep is_virtual | awk '{print $3}') == 'true' ]; then
+    return 0 # True
+  else
+    return 1 # False
+  fi
 }
 
 # See if the system can run the lscpu command.
 lscpu_check() {
-	lscpu > /dev/null 2>&1
-	if [ $? -eq 0 ]; then
-		return 0 # True
-	else
-		return 1 # False
-	fi
+  lscpu > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    return 0 # True
+  else
+    return 1 # False
+  fi
 }
 
 # Compare the versions of LoadWatch
 compare_versions() {
-    # This will return the following numbers for the two arguments passed.
-    # 0 if $1 = $2
-    # 1 if $1 > $2
-    # 2 if $1 < $2
+  # This will return the following numbers for the two arguments passed.
+  # 0 if $1 = $2
+  # 1 if $1 > $2
+  # 2 if $1 < $2
 
-    if [[ $1 == $2 ]]; then
-        return 0
+  if [[ $1 == $2 ]]; then
+    return 0
+  fi
+
+  local IFS=.
+  local i ver1=($1) ver2=($2)
+  # Fill empty fields in ver1 with zeros
+  for ((i=${#ver1[@]}; i<${#ver2[@]}; i++)); do
+    ver1[i]=0
+  done
+
+  for ((i=0; i<${#ver1[@]}; i++)); do
+    if [[ -z ${ver2[i]} ]]; then
+      # Fill empty fields in ver2 with zeros
+      ver2[i]=0
     fi
 
-    local IFS=.
-    local i ver1=($1) ver2=($2)
-    # Fill empty fields in ver1 with zeros
-    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++)); do
-        ver1[i]=0
-    done
+    if ((10#${ver1[i]} > 10#${ver2[i]})); then
+      return 1
+    fi
 
-    for ((i=0; i<${#ver1[@]}; i++)); do
-        if [[ -z ${ver2[i]} ]]; then
-            # Fill empty fields in ver2 with zeros
-            ver2[i]=0
-        fi
+    if ((10#${ver1[i]} < 10#${ver2[i]})); then
+      return 2
+    fi
+  done
 
-        if ((10#${ver1[i]} > 10#${ver2[i]})); then
-            return 1
-        fi
-
-        if ((10#${ver1[i]} < 10#${ver2[i]})); then
-            return 2
-        fi
-    done
-
-    return 0
+  return 0
 }
 
 # Update Check
 update_check() {
-    # Perform update check
-    # Only download the file every 6 hours to reduce the number of times this is done.
-    if [[ ! -e ${TMPFILE} ]]; then
-        wget -O ${TMPFILE} -q ${RAWURL}
-    elif test `find ${TMPFILE} -mmin +360`; then
-        rm -f ${TMPFILE}
-        wget -O ${TMPFILE} -q ${RAWURL}
-    fi
-    readonly NEW_VER=$(cat ${TMPFILE} | grep -m 1 "VERSION=" | cut -d = -f 2)
-    compare_versions ${NEW_VER} ${VERSION}
-    case $? in
-        0)  # No update available. Do nothing.
-            ;;
-        1)  # If Auto Update is enabled, update. Otherwise, report a new version, but do nothing else.
-            if [[ $AUTO_UPDATE == 'true' ]]; then
-                echo "Update Check - Auto Update enabled.  Updating to v${NEW_VER}" >> $LOGDIR/$LOG
-                mv $TMPFILE $DIR/loadwatch
-                chmod +x $DIR/loadwatch
-            else
-                echo "Update Check - LoadWatch v${NEW_VER} available. Auto Update disabled." >> $LOGDIR/$LOG
-            fi
-            ;;
-        2)  # The public version is older than the current version.
-            echo "Update Check - Running LoadWatch version is ${VERSION}, but published version is ${NEW_VER}. Is this a pre-release?" >> $LOGDIR/$LOG
-            ;;
-        *)  # All other values are invalid. Report, but don't cause the program to abort.
-            echo "Update Check - LoadWatch Update Check returned an invalid code ($?). Skipping update." >> $LOGDIR/$LOG
-            ;;
-    esac
+  # Perform update check
+  # Only download the file every 6 hours to reduce the number of times this is done.
+  if [[ ! -e ${TMPFILE} ]]; then
+    wget -O ${TMPFILE} -q ${RAWURL}
+  elif test `find ${TMPFILE} -mmin +360`; then
+    rm -f ${TMPFILE}
+    wget -O ${TMPFILE} -q ${RAWURL}
+  fi
+  readonly NEW_VER=$(cat ${TMPFILE} | grep -m 1 "VERSION=" | cut -d = -f 2)
+  compare_versions ${NEW_VER} ${VERSION}
+  case $? in
+    0)  # No update available. Do nothing.
+      ;;
+    1)  # If Auto Update is enabled, update. Otherwise, report a new version, but do nothing else.
+      if [[ $AUTO_UPDATE == 'true' ]]; then
+        echo "Update Check - Auto Update enabled.  Updating to v${NEW_VER}" >> $LOGDIR/$LOG
+        mv $TMPFILE $DIR/loadwatch
+        chmod +x $DIR/loadwatch
+      else
+        echo "Update Check - LoadWatch v${NEW_VER} available. Auto Update disabled." >> $LOGDIR/$LOG
+      fi
+      ;;
+    2)  # The public version is older than the current version.
+      echo "Update Check - Running LoadWatch version is ${VERSION}, but published version is ${NEW_VER}. Is this a pre-release?" >> $LOGDIR/$LOG
+      ;;
+    *)  # All other values are invalid. Report, but don't cause the program to abort.
+      echo "Update Check - LoadWatch Update Check returned an invalid code ($?). Skipping update." >> $LOGDIR/$LOG
+      ;;
+  esac
 }
 
 # Main process.
 main() {
-	echo "LoadWatch v${VERSION} - Timestamp: ${DATE} - Load: ${LOAD}" >> $LOGDIR/$LOG
+  echo "LoadWatch v${VERSION} - Timestamp: ${DATE} - Load: ${LOAD}" >> $LOGDIR/$LOG
 
-    # Perform update check
-    crontab -l | grep loadwatch | grep root > /dev/null
-    if [ "$?" == 0 ]; then
-        echo "UPDATE NOTICE: Old CRON entry found! Update the Crontab entry to the new path of /opt/loadwatch/loadwatch" >> $LOGDIR/$LOG
+  # Perform update check
+  crontab -l | grep loadwatch | grep root > /dev/null
+  if [ "$?" == 0 ]; then
+    echo "UPDATE NOTICE: Old CRON entry found! Update the Crontab entry to the new path of /opt/loadwatch/loadwatch" >> $LOGDIR/$LOG
+  fi
+  update_check
+
+  # Perform the actual work.
+  if [ -z "${THRESH}" ]; then
+    if [ virtual_check ]; then
+      MAX=5
+    elif [ lscpu_check ]; then
+      MAX=$(lscpu | grep "per socket:" | awk '{print $4}')
+    else
+      MAX=$(cat /proc/cpuinfo | grep "cpu cores" | tail -1 | awk '{print $4}')
     fi
-    update_check
+    THRESH=$(expr $MAX / 2)
+  fi
 
-    # Perform the actual work.
-	if [ -z "${THRESH}" ]; then
-		if [ virtual_check ]; then
-			MAX=5
-		elif [ lscpu_check ]; then
-			MAX=$(lscpu | grep "per socket:" | awk '{print $4}')
-		else
-			MAX=$(cat /proc/cpuinfo | grep "cpu cores" | tail -1 | awk '{print $4}')
-		fi
-		THRESH=$(expr $MAX / 2)
-	fi
-	
-    # Written this way is allows comparison of decimal numbers.
-	if (( $(echo "${LOAD} > ${THRESH}" | bc -l) )); then
-		dump_stats
-	fi
-    
-    # Always perform cleaup to keep with retention settings.
-    cleanup_files
+  # Written this way is allows comparison of decimal numbers.
+  if (( $(echo "${LOAD} > ${THRESH}" | bc -l) )); then
+    dump_stats
+  fi
+
+  # Always perform cleaup to keep with retention settings.
+  cleanup_files
 }
 
 case $1 in
-    update)
-        echo "Running LoadWatch manual update..."
-        wget -O $DIR/loadwatch ${RAWURL}
-        chmod +x $DIR/loadwatch
-        echo "LoadWatch update complete."
-        ;;
-    *)
-        main
-        ;;
+  update)
+    echo "Running LoadWatch manual update..."
+    wget -O $DIR/loadwatch ${RAWURL}
+    chmod +x $DIR/loadwatch
+    echo "LoadWatch update complete."
+    ;;
+  *)
+    main
+    ;;
 esac
 
 exit 0

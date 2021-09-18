@@ -1,7 +1,9 @@
 # LoadWatch
+
 Linux System LoadWatch
 
-LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected or wanted.
+LoadWatch - A more lightweight version of [Sys-Snap](https://github.com/CpanelInc/tech-SysSnapv2) 
+and only triggers when the load is higher than expected or wanted.
 
 #### Version: 1.3.0
 
@@ -9,19 +11,32 @@ LoadWatch - A more lightweight version of Sys-Snap and only triggers when the lo
 
 1. Run the following command, as Root:
 
-       mkdir -p /opt/loadwatch; wget -O /opt/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x /opt/loadwatch/loadwatch
+```bash
+mkdir -p /opt/loadwatch; \
+wget -O /opt/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch \
+&& chmod +x /opt/loadwatch/loadwatch
+```
 
-2. Install `facter`.  You can install it with the proper package manager for your distribution:
- - Arch Linux, Manjaro Linux: `sudo pacman -S facter`
- - Fedora: `sudo dnf install facter`
- - CentOS, RHEL: `sudo yum install epel-release && sudo yum install facter`
- - openSUSE: `sudo zypper install facter`
+2. Install `facter`.  You can install it with the proper package manager for your 
+   distribution:
+	- Arch Linux, Manjaro Linux: `sudo pacman -S facter`
+	- Fedora: `sudo dnf install facter`
+	- CentOS, RHEL: `sudo yum install epel-release && sudo yum install facter`
+	- openSUSE: `sudo zypper install facter`
 
 3. Create the following CRON entry in Root's crontab:
 
-       */1 * * * * /opt/loadwatch/loadwatch
+```
+*/1 * * * * /opt/loadwatch/loadwatch
+```
 
-4. You're done.  LoadWatch will run every minute (unless you change the CRON) and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.  If the server is a virtual machine (i.e. VPS), then the maximum load is 5 with a reported load of 2 or higher. This can be overridden, of course.  It then cleans up any old log files older than 14 days with each run to ensure no logs are kept longer than the defined retention period.
+4. You're done. LoadWatch will run every minute (unless you change the CRON) and
+   the defaults are to record the system state if the load is above the default
+   of 50% of the CPU maximum ability.  If the server is a virtual machine (i.e.
+   VPS), then the maximum load is 5 with a reported load of 2 or higher. This
+   can be overridden, of course.  It then cleans up any old log files older than
+   14 days with each run to ensure no logs are kept longer than the defined
+   retention period.
 
 ## CONFIGURATION
 

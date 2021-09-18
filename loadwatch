@@ -40,7 +40,7 @@
 
 # Change these two variables to override the defaults.
 # Load Threshold for doing a dump. Default is 50% of CPU for physical servers and a load average of 8 for virtual servers.
-THRESH=
+THRESH=0  # <- Set to 0 so always generates a log for testing. - Alex Kr
 # Memory threshold for doing a dump. Default is...
 MEM_THRESH=
 # Retention duration of log files. Default is 14 days.
@@ -65,13 +65,18 @@ readonly TMPFILE=${DIR}/.loadwatch
 readonly RAWURL=https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch
 readonly DIVIDER="=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
-# Make sure our operating directory exists.  By default, this file runs from within this directory, but is not required.
+# Make sure our operating directory exists.  By default, this file runs from 
+# within this directory, but is not required.
 if [ ! -d $DIR ]; then
   mkdir -p $DIR
+else
+  echo 'DEBUG: $DIR exists.' 1>&2
 fi
 
 if [ ! -d $LOGDIR ]; then
   mkdir -p $LOGDIR
+else
+  echo 'DEBUG: $LOGDIR exists.' 1>&2
 fi
 
 # Gather the system stats and put them into the log.

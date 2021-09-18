@@ -9,5 +9,13 @@ tags:
 How to clone repo for testing:
 
 ```bash
-git clone --branch {branch-name} https://github.com/kraker/loadwatch.git
+git clone --branch {branch-name} https://github.com/kraker/loadwatch.git /opt/loadwatch
+cd /opt/loadwatch
+chmod +x loadwatch
+```
+
+Run script manually with:
+
+```bash
+/opt/loadwatch/loadwatch
 ```

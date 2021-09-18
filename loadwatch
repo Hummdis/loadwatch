@@ -38,6 +38,12 @@
 # Set the THRESH and RETEN variables at the top of the file to the desired numbers to override the defaults.
 ####
 
+# Unofficial "Bash Strict Mode"
+# Use this unless you love debugging
+# See: http://redsymbol.net/articles/unofficial-bash-strict-mode
+set -euo pipefail
+IFS=$'\n\t'
+
 # Change these two variables to override the defaults.
 # Load Threshold for doing a dump. Default is 50% of CPU for physical servers and a load average of 8 for virtual servers.
 THRESH=0  # <- Set to 0 so always generates a log for testing. - Alex Kr
@@ -69,20 +75,20 @@ readonly DIVIDER="=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # within this directory, but is not required.
 if [ ! -d $DIR ]; then
   mkdir -p $DIR
-else
-  echo 'DEBUG: $DIR exists.' 1>&2
+#else
+#  echo 'DEBUG: $DIR exists.' 1>&2
 fi
 
 if [ ! -d $LOGDIR ]; then
   mkdir -p $LOGDIR
-else
-  echo 'DEBUG: $LOGDIR exists.' 1>&2
+#else
+#  echo 'DEBUG: $LOGDIR exists.' 1>&2
 fi
 
 # Gather the system stats and put them into the log.
 dump_stats() {
   echo -e "ALERT: Loadwatch Triggered! - Timestamp: ${DATE} - Load: ${LOAD} - Log: ${DIR}/${FILE}" >> $LOGDIR/$LOG
-  echo -e "=-=-=-=-=-=    BEGIN LOADWATCH REPORT - ${VERSION}  =-=-=-=-=-=\n" > $LOGDIR/$FILE
+  echo -e "=-=-=-=-=-=  BEGIN LOADWATCH REPORT - ${VERSION}  =-=-=-=-=-=\n" > $LOGDIR/$FILE
   echo $DATE >> $LOGDIR/$FILE
   echo $LOAD >> $LOGDIR/$FILE
   echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
@@ -93,7 +99,7 @@ dump_stats() {
   mysqladmin processlist stat >> $LOGDIR/$FILE
   echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
   echo "APACHE STATUS AND CONNECTIONS PER DOMAIN" >> $LOGDIR/$FILE
-  /usr/sbin/apachectl fullstatus | tee -a $LOGDIR/$FILE | awk '{print $14}' | sort |sed -e 's/^[[:blank:]]*#.*//' -e '/^[[:blank:]]*$/d' | uniq -c | sort -n | grep -v VHost >> $LOGDIR/$FILE
+  /usr/sbin/apachectl fullstatus | tee -a $LOGDIR/$FILE | awk '{print $14}' | sort | sed -e 's/^[[:blank:]]*#.*//' -e '/^[[:blank:]]*$/d' | uniq -c | sort -n | grep -v VHost >> $LOGDIR/$FILE
   echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
   echo "NETSTAT DETAILS" >> $LOGDIR/$FILE
   netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head >> $LOGDIR/$FILE
@@ -145,7 +151,6 @@ cleanup_files() {
     gzip -f -9 ${NEWLOG}
   fi
   find $LOGDIR -type f -name '${LOG.}*' -mtime +${RETEN} -exec rm -f {} \;
-
 }
 
 # Check for facter, needed to determine if system is physical or virtual. Abort if it's missing.

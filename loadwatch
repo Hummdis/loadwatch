@@ -63,7 +63,7 @@ AUTO_UPDATE='false'
 
 # Variables
 readonly DATE=$(date +%F_%H.%M) # <- Change formatting to exclude ':' - Alex Kr
-readonly VERSION=1.3.5
+readonly VERSION=1.3.6
 readonly LOAD=$(cat /proc/loadavg | awk '{print $1}')
 #echo "DEBUG: LOAD=${LOAD}" 1>&2
 # MEM is a percentage of memory used expressed as a float. Ex: 26.29

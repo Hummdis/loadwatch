@@ -46,10 +46,12 @@ IFS=$'\n\t'
 
 # Change these two variables to override the defaults.
 # Load Threshold for doing a dump. Default is 50% of CPU for physical servers and a load average of 8 for virtual servers.
-THRESH=0  # <- Set to 0 so always generates a log for testing. - Alex Kr
+THRESH= 
+# <- Set to 0 so always generates a log for testing. - Alex Kr
 #echo "DEBUG: THRESH=${THRESH}" 1>&2
 # Memory threshold for doing a dump. Default is...
-MEM_THRESH=0 # <- Set to 0 so always triggers when testing. - Alex Kr
+MEM_THRESH= 
+# <- Set to 0 so always triggers when testing. - Alex Kr
 #echo "DEBUG: MEM_THRESH=${MEM_THRESH}" 1>&2
 # Retention duration of log files. Default is 14 days.
 RETEN=
@@ -264,7 +266,7 @@ update_check() {
 
 # Main process.
 main() {
-echo 'DEBUG: main() triggered' 1>&2
+#echo 'DEBUG: main() triggered' 1>&2
   echo "LoadWatch v${VERSION} - Timestamp: ${DATE} - Load: ${LOAD}" >> $LOGDIR/$LOG
 
   # Perform update check
@@ -289,11 +291,12 @@ echo 'DEBUG: main() triggered' 1>&2
       MAX=$(cat /proc/cpuinfo | grep "cpu cores" | tail -1 | awk '{print $4}')
     fi
     THRESH=$(expr $MAX / 2)
-  elif [ -z "${MEM_THRESH}" ]; then
-#echo "DEBUG: MEM_THRESH is *not* set." 1>&2
+  fi
+
+  if [ -z "${MEM_THRESH}" ]; then
+#echo "DEBUG: MEM_THRESH is *not* set." >&2
     MEM_THRESH=50
-  else
-#echo "DEBUG: THRESH and MEM_THRESH are both set." 1>&2
+#echo "DEBUG: MEM_THRESH=${MEM_THRESH}" >&2
   fi
 
   # Written this way is allows comparison of decimal numbers.
@@ -305,7 +308,7 @@ echo 'DEBUG: main() triggered' 1>&2
   elif (( $(echo "${MEM} > ${MEM_THRESH}" | bc -l) )); then
 #echo "DEBUG: MEM is < MEM_THRESH." 1>&2
     dump_stats
-  else
+#  else
 #echo "DEBUG: Neither LOAD > THRESH nor MEM > MEM_THRESH" 1>&2
   fi
 

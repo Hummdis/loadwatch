@@ -15,7 +15,7 @@
 #
 # 1. Run the following command, as Root:
 #
-# mkdir -p ~/loadwatch; wget -O ~/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x ~/loadwatch/loadwatch
+# mkdir -p /opt/loadwatch; wget -O /opt/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x /opt/loadwatch/loadwatch
 #
 # 2. Install facter
 #
@@ -52,7 +52,7 @@ AUTO_UPDATE='true'
 ########################################################################
 
 # Variables
-readonly VERSION=1.3.4
+readonly VERSION=1.3.5
 readonly DATE=$(date +%F.%H:%M)
 readonly LOAD=$(cat /proc/loadavg | awk '{print $1}')
 readonly FILE=loadwatch_${DATE}_Load.${LOAD}.log
@@ -128,7 +128,7 @@ cleanup_files() {
     fi
     
     # Cleanup the loadwatch_ log files.
-    find $LOGDIR -name 'loadwatch_*' -mtime +${RETEN} -exec rm -f {} \;
+    find $LOGDIR -name 'loadwatch_*' -mtime +${RETEN} -delete
 
 	# Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
 	if [ $(date +%H%M) == 0000 ]; then
@@ -137,7 +137,7 @@ cleanup_files() {
 		touch $LOGDIR
 		gzip -f -9 ${NEWLOG}
 	fi
-	find $LOGDIR -type f -name '${LOG.}*' -mtime +${RETEN} -exec rm -f {} \;
+	find $LOGDIR -type f -name '${LOG.}*' -mtime +${RETEN} -delete
 
 }
 

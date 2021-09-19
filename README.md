@@ -42,9 +42,12 @@ wget -O /opt/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadw
 
 Defaults:
     THRESH: 50% of real CPU and 5 for virtual machines.
+    MEM_THRESH: 50% of MEM used.
     RETEN: 14 days
 
-Set the `THRESH` and `RETEN` variables at the top of the file to the desired numbers. Remember that the `THRESH` variable will be devided in 2, but rounded to the next highest whole number.
+Set the `THRESH`, `MEM_THRESH`, and `RETEN` variables at the top of the file to
+the desired numbers. Remember that the `THRESH` variable will be devided in 2,
+but rounded to the next highest whole number.
 
 ### Auto-Update
 

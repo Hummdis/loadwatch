@@ -8,14 +8,18 @@
 # Released under the Apache License 2.0.
 
 ####
-# LoadWatch - A more lightweight version of Sys-Snap and only triggers when the load is higher than expected or wanted.
+# LoadWatch - A more lightweight version of Sys-Snap and only triggers when the
+# load is higher than expected or wanted.
 #
 #
 # INSTALLATION
 #
-# 1. Run the following command, as Root:
+# 1. Run the following commands, as Root:
 #
-# mkdir -p /opt/loadwatch; wget -O /opt/loadwatch/loadwatch https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch && chmod +x /opt/loadwatch/loadwatch
+# mkdir -p /opt/loadwatch
+# wget -O /opt/loadwatch/loadwatch \
+# https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch 
+# chmod +x /opt/loadwatch/loadwatch
 #
 # 2. Install facter
 #
@@ -29,13 +33,17 @@
 #
 # */1 * * * * /root/loadwatch/loadwatch
 #
-# 4. You're done.  It'll run every minute and the defaults are to record the system state if the load is above the default of 50% of the CPU maximum ability.
-#    If the server is a virtual machine (i.e. VPS), then the maximum load is 16 with a reported load of 8 or higher. This can be overridden, of course.
+# 4. You're done.  It'll run every minute and the defaults are to record the 
+#    system state if the load is above the default of 50% of the CPU maximum 
+#    ability.
+#    If the server is a virtual machine (i.e. VPS), then the maximum load is 16
+#    with a reported load of 8 or higher. This can be overridden, of course.
 #    It then cleans up any old log files older than 14 days.
 #
 # CONFIGURATION
 #
-# Set the THRESH and RETEN variables at the top of the file to the desired numbers to override the defaults.
+# Set the THRESH, MEM_THRESH, and RETEN variables at the top of the file to the
+# desired numbers to override the defaults.
 ####
 
 # Unofficial "Bash Strict Mode"
@@ -45,7 +53,8 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Change these two variables to override the defaults.
-# Load Threshold for doing a dump. Default is 50% of CPU for physical servers and a load average of 8 for virtual servers.
+# Load Threshold for doing a dump. Default is 50% of CPU for physical servers
+# and a load average of 8 for virtual servers.
 THRESH= 
 #echo "DEBUG: THRESH=${THRESH}" 1>&2
 # Memory threshold for doing a dump. Default is 50% used MEM.
@@ -57,25 +66,40 @@ RETEN=
 AUTO_UPDATE='false'
 
 
-########################################################################
-# NO MORE CHANGES BELOW THIS POINT, UNLESS YOU KNOW WHAT YOU'RE DOING. #
-########################################################################
+################################################################################
+#     NO MORE CHANGES BELOW THIS POINT, UNLESS YOU KNOW WHAT YOU'RE DOING.     #
+################################################################################
 
 # Variables
-readonly DATE=$(date +%F_%H.%M) # <- Change formatting to exclude ':' - Alex Kr
-readonly VERSION=1.3.6
-readonly LOAD=$(cat /proc/loadavg | awk '{print $1}')
+DATE=$(date +%F_%H.%M) # <- Change formatting to exclude ':' - Alex Kr
+VERSION=1.4.0
+#shellcheck disable=SC2002
+LOAD=$(cat /proc/loadavg | awk '{print $1}')
 #echo "DEBUG: LOAD=${LOAD}" 1>&2
 # MEM is a percentage of memory used expressed as a float. Ex: 26.29
-readonly MEM=$(free -t | awk 'NR == 2 {printf("%.2f"), $3/$2*100}')
+MEM=$(free -t | awk 'NR == 2 {printf("%.2f"), $3/$2*100}')
 #echo "DEBUG: MEM=${MEM}" 1>&2
-readonly FILE=loadwatch_${DATE}_Load.${LOAD}.log
-readonly DIR=/opt/loadwatch
-readonly LOGDIR=/var/log/loadwatch
-readonly LOG=checklog
-readonly TMPFILE=${DIR}/.loadwatch
-readonly RAWURL=https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch
-readonly DIVIDER="=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+FILE=loadwatch_${DATE}_Load.${LOAD}.log
+DIR=/opt/loadwatch
+LOGDIR=/var/log/loadwatch
+LOG=checklog
+TMPFILE=${DIR}/.loadwatch
+RAWURL=https://raw.githubusercontent.com/Hummdis/loadwatch/master/loadwatch
+DIVIDER="=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+# For security, make all vars read-only
+readonly DATE
+readonly VERSION
+readonly LOAD
+readonly MEM
+readonly FILE
+readonly DIR
+readonly LOGDIR
+readonly LOG
+readonly TMPFILE
+readonly RAWURL
+readonly DIVIDER
 
 # Make sure our operating directory exists.  By default, this file runs from 
 # within this directory, but is not required.
@@ -91,55 +115,65 @@ if [ ! -d $LOGDIR ]; then
 #  echo 'DEBUG: $LOGDIR exists.' 1>&2
 fi
 
+
 # Gather the system stats and put them into the log.
-dump_stats() {
-  echo -e "ALERT: Loadwatch Triggered! - Timestamp: ${DATE} - Load: ${LOAD} - Log: ${DIR}/${FILE}" >> $LOGDIR/$LOG
-  echo -e "=-=-=-=-=-=  BEGIN LOADWATCH REPORT - ${VERSION}  =-=-=-=-=-=\n" > $LOGDIR/$FILE
-  echo $DATE >> $LOGDIR/$FILE
-  echo $LOAD >> $LOGDIR/$FILE
-  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-  echo "FREE RAM" >> $LOGDIR/$FILE
-  free -m >> $LOGDIR/$FILE
-  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-  echo "MySQL PROCCESS LIST" >> $LOGDIR/$FILE
-  mysqladmin processlist stat >> $LOGDIR/$FILE
-  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-  echo "APACHE STATUS AND CONNECTIONS PER DOMAIN" >> $LOGDIR/$FILE
-  /usr/sbin/apachectl fullstatus | tee -a $LOGDIR/$FILE | awk '{print $14}' | sort | sed -e 's/^[[:blank:]]*#.*//' -e '/^[[:blank:]]*$/d' | uniq -c | sort -n | grep -v VHost >> $LOGDIR/$FILE
-  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-  echo "NETSTAT DETAILS" >> $LOGDIR/$FILE
-  netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -nr | head >> $LOGDIR/$FILE
-  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-  echo "TOP STATUS" >> $LOGDIR/$FILE
-  # Make sure the COLUMNS system value is set to 1000 before running TOP to make sure we get the full command being run.
-  COLUMNS=1000; top -bcn 1 >> $LOGDIR/$FILE
-  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-  echo "PROCESS LIST" >> $LOGDIR/$FILE
-  ps auxf >> $LOGDIR/$FILE
-  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-  echo "EXIM STATS" >> $LOGDIR/$FILE
-  /usr/sbin/exiwhat >> $LOGDIR/$FILE
-  echo -e "\n${DIVIDER}\n" >> $LOGDIR/$FILE
-  echo "IOSTAT DETAILS" >> $LOGDIR/$FILE
-  iostat >> $LOGDIR/$FILE
-  echo -e "\n=-=-=-=-=-=   END OF REPORT   =-=-=-=-=-=" >> $LOGDIR/$FILE
+function dump_stats() {
+  echo -e "ALERT: Loadwatch Triggered! - Timestamp: ${DATE} - Load: ${LOAD} \
+  - Log: ${DIR}/${FILE}" >> $LOGDIR/$LOG
+  echo -e "=-=-=-=-=-=  BEGIN LOADWATCH REPORT - ${VERSION}  =-=-=-=-=-=\n" \
+    > $LOGDIR/"$FILE"
+  echo $DATE >> "$LOGDIR"/"$FILE"
+  echo "$LOAD" >> "$LOGDIR"/"$FILE"
+  echo -e "\n${DIVIDER}\n" >> "$LOGDIR"/"$FILE"
+  echo "FREE RAM" >> "$LOGDIR"/"$FILE"
+  free -m >> "$LOGDIR"/"$FILE"
+  echo -e "\n${DIVIDER}\n" >> "$LOGDIR"/"$FILE"
+  echo "MySQL PROCCESS LIST" >> "$LOGDIR"/"$FILE"
+  mysqladmin processlist stat >> "$LOGDIR"/"$FILE"
+  echo -e "\n${DIVIDER}\n" >> "$LOGDIR"/"$FILE"
+  echo "APACHE STATUS AND CONNECTIONS PER DOMAIN" >> "$LOGDIR"/"$FILE"
+  /usr/sbin/apachectl fullstatus | tee -a "$LOGDIR"/"$FILE" | \
+    awk '{print $14}' | sort | sed -e 's/^[[:blank:]]*#.*//' \
+    -e '/^[[:blank:]]*$/d' | uniq -c | sort -n | grep -v VHost \
+    >> "$LOGDIR"/"$FILE"
+  echo -e "\n${DIVIDER}\n" >> "$LOGDIR"/"$FILE"
+  echo "NETSTAT DETAILS" >> "$LOGDIR"/"$FILE"
+  netstat -tn 2>/dev/null | grep :80 | awk '{print $5}' | cut -d: -f1 | sort \
+    | uniq -c | sort -nr | head >> "$LOGDIR"/"$FILE"
+  echo -e "\n${DIVIDER}\n" >> "$LOGDIR"/"$FILE"
+  echo "TOP STATUS" >> "$LOGDIR"/"$FILE"
+  # Make sure the COLUMNS system value is set to 1000 before running TOP to \
+  # make sure we get the full command being run.
+  COLUMNS=1000; top -bcn 1 >> "$LOGDIR"/"$FILE"
+  echo -e "\n${DIVIDER}\n" >> "$LOGDIR"/"$FILE"
+  echo "PROCESS LIST" >> "$LOGDIR"/"$FILE"
+  ps auxf >> "$LOGDIR"/"$FILE"
+  echo -e "\n${DIVIDER}\n" >> "$LOGDIR"/"$FILE"
+  echo "EXIM STATS" >> "$LOGDIR"/"$FILE"
+  /usr/sbin/exiwhat >> "$LOGDIR"/"$FILE"
+  echo -e "\n${DIVIDER}\n" >> "$LOGDIR"/"$FILE"
+  echo "IOSTAT DETAILS" >> "$LOGDIR"/"$FILE"
+  iostat >> "$LOGDIR"/"$FILE"
+  echo -e "\n=-=-=-=-=-=   END OF REPORT   =-=-=-=-=-=" >> "$LOGDIR"/"$FILE"
 }
 
+
 # Perform cleanup. Check if the user has set a value. If not, default to 14.
-cleanup_files() {
+function cleanup_files() {
   if [ -z "${RETEN}" ]; then
     RETEN=14
   fi
 
-    # Starting in version 1.3.0, the log path is /var/log/loadwatch.  Move any log
-    # files from the old path to the new.  If the checklog file exists here then
-    # all other files exist here as well, so move them all.
+    # Starting in version 1.3.0, the log path is /var/log/loadwatch.  Move any 
+    # log files from the old path to the new.  If the checklog file exists here
+    # then all other files exist here as well, so move them all.
     if test -f /root/loadwatch/checklog; then
         mv /root/loadwatch/checklog* $LOGDIR/ > /dev/null 2>&1
         mv /root/loadwatch/loadwatch_* $LOGDIR/ > /dev/null 2>&1
     fi
     
-    # Don't break the current CRON entry, make a symlink, if the old path exists.
+    # Don't break the current CRON entry, make a symlink, if the old path
+    # exists.
     if [ -h /root/loadwatch/loadwatch ]; then
         rm -f /root/loadwatch/loadwatch
         ln -s $DIR/loadwatch /root/loadwatch/loadwatch
@@ -149,33 +183,39 @@ cleanup_files() {
     # Cleanup the loadwatch_ log files.
     find $LOGDIR -name 'loadwatch_*' -mtime +${RETEN} -exec rm -f {} \;
 
-	# Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
-	if [ $(date +%H%M) == 0000 ]; then
+	# Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any
+  # older than the retention period.
+	if [ "$(date +%H%M)" == 0000 ]; then
 		NEWLOG=${LOGDIR}/${LOG}.$(date -d "yesterday" +%Y-%m-%d)
-		mv ${LOGDIR}/${LOG} ${NEWLOG}
+		mv ${LOGDIR}/${LOG} "${NEWLOG}"
 		touch $LOGDIR
-		gzip -f -9 ${NEWLOG}
+		gzip -f -9 "${NEWLOG}"
 	fi
-	find $LOGDIR -type f -name '${LOG.}*' -mtime +${RETEN} -exec rm -f {} \;
+	find $LOGDIR -type f -name "${LOG.}*" -mtime +${RETEN} -exec rm -f {} \;
 
   # Cleanup the loadwatch_ log files.
   find $LOGDIR -name 'loadwatch_*' -mtime +${RETEN} -exec rm -f {} \;
 
-  # Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any older than the retention period.
-  if [ $(date +%H%M) == 0000 ]; then
+  # Rotate the 'checklog' file every 24 hours and compress it.  Then, delete any
+  # older than the retention period.
+  if [ "$(date +%H%M)" == 0000 ]; then
     NEWLOG=${LOGDIR}/${LOG}.$(date -d "yesterday" +%Y-%m-%d)
-    mv ${LOGDIR}/${LOG} ${NEWLOG}
+    #shellcheck disable=SC2224
+    mv "${LOGDIR}"/"${LOG}""${NEWLOG}"
     touch $LOGDIR
-    gzip -f -9 ${NEWLOG}
+    gzip -f -9"${NEWLOG}"
   fi
-  find $LOGDIR -type f -name '${LOG.}*' -mtime +${RETEN} -exec rm -f {} \;
+  find $LOGDIR -type f -name "${LOG.}*" -mtime +${RETEN} -exec rm -f {} \;
 }
 
-# Check for facter, needed to determine if system is physical or virtual. Abort if it's missing.
-facter_check() {
+
+# Check for facter, needed to determine if system is physical or virtual. Abort
+# if it's missing.
+function facter_check() {
   facter > /dev/null 2>&1
   if [ $? -ne 0 ]; then
-    echo "Facter is not installed. Please install it with the proper package manager for your distribution:"
+    echo "Facter is not installed. Please install it with the proper package \
+manager for your distribution:"
     echo -e "\tsudo pacman -S facter"
     echo -e "\tsudo dnf install facter"
     echo -e "\tyum install epel-release && yum install fracter"
@@ -185,39 +225,41 @@ facter_check() {
   fi
 }
 
+
 # Perform the actual virtual machine check
-virtual_check() {
+function virtual_check() {
   facter_check
-  if [ $(facter | grep is_virtual | awk '{print $3}') == 'true' ]; then
+  if facter | grep "is_virtual" | awk '{print $3}'; then
     return 0 # True
   else
     return 1 # False
   fi
 }
+
 
 # See if the system can run the lscpu command.
-lscpu_check() {
-  lscpu > /dev/null 2>&1
-  if [ $? -eq 0 ]; then
+function lscpu_check() {
+  if lscpu > /dev/null 2>&1; then
     return 0 # True
   else
     return 1 # False
   fi
 }
 
+
 # Compare the versions of LoadWatch
-compare_versions() {
+function compare_versions() {
   # This will return the following numbers for the two arguments passed.
   # 0 if $1 = $2
   # 1 if $1 > $2
   # 2 if $1 < $2
 
-  if [[ $1 == $2 ]]; then
+  if [[ $1 == "$2" ]]; then
     return 0
   fi
 
   local IFS=.
-  local i ver1=($1) ver2=($2)
+  local i ver1=("$1") ver2=("$2")
   # Fill empty fields in ver1 with zeros
   for ((i=${#ver1[@]}; i<${#ver2[@]}; i++)); do
     ver1[i]=0
@@ -241,66 +283,80 @@ compare_versions() {
   return 0
 }
 
+
 # Update Check
-update_check() {
+function update_check() {
   # Perform update check
-  # Only download the file every 6 hours to reduce the number of times this is done.
+  # Only download the file every 6 hours to reduce the number of times this is
+  # done.
   if [[ ! -e ${TMPFILE} ]]; then
     wget -O ${TMPFILE} -q ${RAWURL}
-  elif test `find ${TMPFILE} -mmin +360`; then
+  elif test "$(find $TMPFILE -mmin +360)"; then
     rm -f ${TMPFILE}
     wget -O ${TMPFILE} -q ${RAWURL}
   fi
-  readonly NEW_VER=$(cat ${TMPFILE} | grep -m 1 "VERSION=" | cut -d = -f 2)
-  compare_versions ${NEW_VER} ${VERSION}
+  #shellcheck disable=SC2002
+  NEW_VER=$(cat ${TMPFILE} | grep -m 1 "VERSION=" | cut -d = -f 2)
+  readonly NEW_VER
+  compare_versions "${NEW_VER}" ${VERSION}
   case $? in
     0)  # No update available. Do nothing.
       ;;
-    1)  # If Auto Update is enabled, update. Otherwise, report a new version, but do nothing else.
+    1)  # If Auto Update is enabled, update. Otherwise, report a new version, 
+        # but do nothing else.
       if [[ $AUTO_UPDATE == 'true' ]]; then
-        echo "Update Check - Auto Update enabled.  Updating to v${NEW_VER}" >> $LOGDIR/$LOG
+        echo "Update Check - Auto Update enabled.  Updating to v${NEW_VER}" \
+          >> $LOGDIR/$LOG
         mv $TMPFILE $DIR/loadwatch
         chmod +x $DIR/loadwatch
       else
-        echo "Update Check - LoadWatch v${NEW_VER} available. Auto Update disabled." >> $LOGDIR/$LOG
+        echo "Update Check - LoadWatch v${NEW_VER} available. Auto Update \
+disabled." >> $LOGDIR/$LOG
       fi
       ;;
     2)  # The public version is older than the current version.
-      echo "Update Check - Running LoadWatch version is ${VERSION}, but published version is ${NEW_VER}. Is this a pre-release?" >> $LOGDIR/$LOG
+      echo "Update Check - Running LoadWatch version is ${VERSION}, but \
+published version is ${NEW_VER}. Is this a pre-release?" >> $LOGDIR/$LOG
       ;;
-    *)  # All other values are invalid. Report, but don't cause the program to abort.
-      echo "Update Check - LoadWatch Update Check returned an invalid code ($?). Skipping update." >> $LOGDIR/$LOG
+    *)  # All other values are invalid. Report, but don't cause the program to
+        # abort.
+      echo "Update Check - LoadWatch Update Check returned an invalid code \
+($?). Skipping update." >> $LOGDIR/$LOG
       ;;
   esac
 }
 
+
 # Main process.
-main() {
+function main() {
 #echo 'DEBUG: main() triggered' 1>&2
-  echo "LoadWatch v${VERSION} - Timestamp: ${DATE} - Load: ${LOAD}" >> $LOGDIR/$LOG
+  echo "LoadWatch v${VERSION} - Timestamp: ${DATE} - Load: ${LOAD}" \
+    >> $LOGDIR/$LOG
 
   # Perform update check
 #  $(crontab -l | grep loadwatch | grep root > /dev/null)
 # ^ Because this pipe exits as 1 when nothing is found, causes script to exit
 # prematurely in bash hard-mode. 1 is an error. We need to evaluate the 
 # expression in the if statement instead. - Alex Kr
-  if $(crontab -l | grep loadwatch | grep root > /dev/null); then
+  if crontab -l | grep loadwatch | grep root > /dev/null; then
 #echo "DEBUG: UPDATE NOTICE triggered." 1>&2
-    echo "UPDATE NOTICE: Old CRON entry found! Update the Crontab entry to the new path of /opt/loadwatch/loadwatch" >> $LOGDIR/$LOG
+    echo "UPDATE NOTICE: Old CRON entry found! Update the Crontab entry to the \
+new path of /opt/loadwatch/loadwatch" >> $LOGDIR/$LOG
   fi
   update_check
 
   # Perform the actual work.
   if [ -z "${THRESH}" ]; then
 #echo "DEBUG: THRESH is *not* set." 1>&2
-    if [ virtual_check ]; then
+    if virtual_check; then
       MAX=5
-    elif [ lscpu_check ]; then
+    elif lscpu_check; then
       MAX=$(lscpu | grep "per socket:" | awk '{print $4}')
     else
+      #shellcheck disable=SC2002
       MAX=$(cat /proc/cpuinfo | grep "cpu cores" | tail -1 | awk '{print $4}')
     fi
-    THRESH=$(expr $MAX / 2)
+    THRESH=${#MAX / 2}
   fi
 
   if [ -z "${MEM_THRESH}" ]; then
@@ -326,7 +382,8 @@ main() {
   cleanup_files
 }
 
-case ${1-default} in  # Set a default expansion to avoid failures in bash strict-mode
+# Set a default expansion to avoid failures in bash strict-mode
+case ${1-default} in
   update)
     echo "Running LoadWatch manual update..."
     wget -O $DIR/loadwatch ${RAWURL}

@@ -191,7 +191,7 @@ function cleanup_files() {
 		touch $LOGDIR
 		gzip -f -9 "${NEWLOG}"
 	fi
-	find $LOGDIR -type f -name "${LOG.}*" -mtime +${RETEN} -exec rm -f {} \;
+	find $LOGDIR -type f -name "${LOG}.*" -mtime +${RETEN} -exec rm -f {} \;
 
   # Cleanup the loadwatch_ log files.
   find $LOGDIR -name 'loadwatch_*' -mtime +${RETEN} -exec rm -f {} \;
@@ -205,7 +205,7 @@ function cleanup_files() {
     touch $LOGDIR
     gzip -f -9"${NEWLOG}"
   fi
-  find $LOGDIR -type f -name "${LOG.}*" -mtime +${RETEN} -exec rm -f {} \;
+  find $LOGDIR -type f -name "${LOG}.*" -mtime +${RETEN} -exec rm -f {} \;
 }
 
 
@@ -229,7 +229,7 @@ manager for your distribution:"
 # Perform the actual virtual machine check
 function virtual_check() {
   facter_check
-  if facter | grep "is_virtual" | awk '{print $3}'; then
+  if $(facter | grep "is_virtual" | awk '{print $3}'); then
     return 0 # True
   else
     return 1 # False
@@ -356,7 +356,7 @@ new path of /opt/loadwatch/loadwatch" >> $LOGDIR/$LOG
       #shellcheck disable=SC2002
       MAX=$(cat /proc/cpuinfo | grep "cpu cores" | tail -1 | awk '{print $4}')
     fi
-    THRESH=${#MAX / 2}
+    THRESH=$(($MAX / 2))
   fi
 
   if [ -z "${MEM_THRESH}" ]; then
